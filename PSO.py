@@ -436,7 +436,7 @@ class Metodo:
 	    raise NameError, u'Vreinit method is only applied with HPSO algorithm, please set Vreinit method to None'
 	
         if self.restricao == None:
-            self.restricao == True
+            self.restricao = True
         elif (self.restricao != True) and (self.restricao != False):
             raise NameError, u'A restrição assume valores lógicos True ou False'
         
@@ -1223,17 +1223,17 @@ class PSO:
  
             # Liberação da proxima iteração
             Controle_Iteracao.release()
-        
-	for it in xrange(self.itmax):
-	    for ID_particula in xrange(self.Num_particulas):
-		if isnan(vetor_fitness[it][ID_particula]):
-		    raise NameError, u'Existe NaN como valor de função objetivo. Verificar.'
-		
+    
         # Armazenamento das informações em variáveis da classe (disponíveis para o Programa Principal)
         self.historico_fitness  = vetor_fitness    
         self.historico_posicoes = vetor_posicoes
         self.gbest              = gbest
         self.best_fitness       = best_fitness
+
+	for it in xrange(self.itmax):
+	    for ID_particula in xrange(self.Num_particulas):
+		if isnan(self.historico_fitness[it][ID_particula]):
+		    raise NameError, u'Existe NaN como valor de função objetivo. Verificar.'
     
     def Result_txt(self,base_path=None):
         '''
