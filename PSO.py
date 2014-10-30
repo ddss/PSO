@@ -1018,7 +1018,34 @@ class PSO:
 	self.Vstart = abs((max(self.limite_superior) - min(self.limite_inferior))/2.0)
 	self.Tend   = 0.95*self.itmax
 
-    def Busca(self,FO):        
+    def Busca(self,FO,printit=False):
+	'''
+	Método para realizar a etapa de busca na função objetivo
+	
+	===================
+	Entrada obrigatória
+	===================
+	
+	* ``FO`` : função objetivo no formato de Thread com atributo de resposta ``result`` (sendo um float). Exemplo: ::
+	
+	    from threading import Thread
+            
+            class FO(Thread):
+                result = 0
+                def __init__(self,param,args):
+                    Thread.__init__(self)
+                    self.x = param
+    
+                def run(self):
+                    
+                    self.result =  self.x**2
+	
+	================
+	Entrada opcional
+	================
+	
+	* ``printit`` (bool: True ou False): se True o número das iterações, ao decorrer da busca, são apresentadas em tela.
+	'''
         global Controle_FO, Controle_Particula, Controle_Iteracao, Controle_variaveis, total_particulas_atendidas, Controle_Total_Threads
         global vetor_posicoes, vetor_fitness, vetor_velocidades, best_fitness, gbest # Apenas para o método de gbest Enxame
         
@@ -1160,8 +1187,9 @@ class PSO:
             
             # Aquisição de Controle_Iteração, para iniciar a iteração
             Controle_Iteracao.acquire()
-            sys.stdout.write('ITERACAO: '+str(it)+'\n')
-            sys.stdout.flush()
+	    if printit == True:
+		sys.stdout.write('ITERACAO: '+str(it)+'\n')
+		sys.stdout.flush()
             
 	    # Atualização de w, C1, C2 e Vreinit
             if self.metodo.inercia == 'Constante':
