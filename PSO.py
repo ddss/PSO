@@ -48,7 +48,7 @@ use('Agg')
 
 
 from matplotlib.pyplot import figure, axes, plot, subplot, xlabel, ylabel,\
-    title, legend, savefig,  xlim, ylim, close, gca
+    title, legend, savefig,  xlim, ylim, close, gca, hist
 from mpl_toolkits.mplot3d import Axes3D, proj3d
 from matplotlib.patches import Ellipse, FancyArrowPatch
 
@@ -1573,7 +1573,6 @@ class PSO:
             fig.savefig(base_path+'W_inertia_weight.png')
             close()
 
-	# Gráfico da função objetivo----------------------------------------------
 	# Transformação do histórico das posições e do fitness
 	hist_posicoes = []; hist_fitness = []
 	for it in xrange(self.itmax):
@@ -1581,6 +1580,19 @@ class PSO:
 		hist_posicoes.append(self.historico_posicoes[it][ID_particula])
 		hist_fitness.append(self.historico_fitness[it][ID_particula])
 
+	
+	# Histograma das posições
+	for D in xrange(self.Num_parametros):
+	    aux = [hist_posicoes[it][D] for it in xrange(self.itmax+1)] # obtenção das posições para a dimensão D
+	    
+	    fig = figure()
+	    ax = fig.add_subplot(1,1,1)
+	    hist(aux,normed=True,histtype='stepfilled',color='b')
+	    ylabel(u'Frequência normalizada')
+	    xlabel(u'Valores dos parâmetros')
+	    fig.savefig(base_path+'Histograma_parametros_%d'%(D+1)+'.png')
+	    
+	# Gráfico da função objetivo----------------------------------------------
 	for ix in xrange(self.Num_parametros):
 	    # Gráfico unidimensional da função objetivo
 	    # Desenvolvimento das Iterações - Velocidades
