@@ -17,7 +17,7 @@ Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-line
 Num_particulas=30,itmax=100,w=[0.9,0.4],args_model=args_model)
 Otimizacao.Busca(Modelo,printit=True) # Do the search
 Otimizacao.Result_txt() # Printing results in the same folder as txt files
-Otimizacao.Graficos(Nome_param=[r'$\theta_1$',r'$\theta_2$'],Unid_param=['admin','admin2'],FO2a2=True)  # Creating performance graphs in the same folder, including the objective function in 3d (FO2a2=True)
+Otimizacao.Graficos(Nome_param=[r'$\theta_1$',r'$\theta_2$'],Unid_param=[None,None],FO2a2=True)  # Creating performance graphs in the same folder, including the objective function in 3d (FO2a2=True)
 
 # To create movie frames uncomment the line below
 # Otimizacao.Movie(Nome_param=[r'$\theta_1$',r'$\theta_2$'],tipos=['projecao','funcao']) # Creating movie frames

@@ -1410,6 +1410,9 @@ class PSO:
                 if len(Unid_param) != self.Num_parametros and len(Unid_param) != 0:
                     raise NameError, u'Unid_param deve conter as unidades para todos os parâmetros'
 
+            if all([unid is None for unid in Unid_param]):
+                Unid_param = None
+
         if 'FO2a2' in kwargs.keys():
             if kwargs['FO2a2'] == False:
                 FO2a2 = False
