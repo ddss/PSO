@@ -281,7 +281,7 @@ class Metodo:
         '''
         Classe para transformar o argumento ``metodo`` do PSO, em atributos. Além de definir os valores default dos métodos.
         
-        Chaves disponíveis: ``busca`` , ``algoritmo`` , ``inercia`` , ``aceleracao`` , ``CFM`` , ``Vreinit`` , ``restricao`` , ``gbest``
+        Chaves disponíveis: ``busca`` , ``algoritmo`` , ``inercia`` , ``aceleracao`` , ``Vreinit`` , ``restricao`` , ``gbest``, ``parada``
         
         =================================
         Conteúdos disponíveis por chaves:
@@ -298,14 +298,14 @@ class Metodo:
         * ``inercia``: ``Constante`` ou ``TVIW-linear`` ou ``TVIW-Adaptative-VI`` ou ``TVIW-random``
         
         * ``aceleracao``: ``Constante`` ou ``TVAC``
-        
-        * ``CFM``: ``True`` ou ``False``
 
         * ``Vreinit``: ``Constante`` ou ``TVVr-linear``
         
         * ``restricao``: ``True`` ou ``False``
 
         * ``gbest``: ``Particula`` ou ``Enxame``
+
+        * ``parada``: ``itmax`` ou ``desviorelativo``
                 
         ================
         Valores default:
@@ -322,138 +322,140 @@ class Metodo:
         * ``inercia``: define o método do peso de inércia. Se ``algoritmo`` é ``PSO`` e ``busca`` è ``Regiao``, então, o método de inérci é ``TVIW-linear``. Caso contrário, ``Constante``
         
         * ``aceleracao``: define o método para fatores de aceleração. Se ``algoritmo`` é ``PSO``, ``aceleração`` é ``Constante``. Caso ``algoritmo`` seja ``HPSO`` e ``busca`` seja ``Otimo``, então ``TVAC``. Se ``busca`` for ``Regiao``, então ``Constante``.
-        
-        * ``CFM``: define se método CFM (constriction factor method) é utilizado. Caso não definido ele não é utilizado, pois conforme [11] ele pode ser entendido como um caso especial do método do peso de inércia com variação linear.
-        
+
         * ``Vreinit``: método para definir o comportamento da reinicialização do HPSO. Caso não definido é utilizado o ``TVVr-linear``
         
         * ``restricao``: define se os limites serão utilizados como restrições. Caso não definido é assumido o valor lógico ``True``
         
         * ``gbest``: define como a atualização de ``gbest`` (ponto ótimo) é realizada. Se o método de busca é ``Otimo``, então ``Particula`` . Caso o método de busca seja ``Regiao``, então ``Enxame``.
+
+        * ``parada``: define como o algoritmo de PSO deve finalizar sua execução
         '''
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
         # -------------------------------------------------------------------------------
         # Métodos disponíveis
-        self.__metodosdisponiveis = {'busca': ['Otimo', 'Regiao'],
-                                     'algoritmo': ['PSO', 'HPSO'],
-                                     'inercia': ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptative-VI'],
+        # TODO: terminar evolucaogbest
+        self._metodosdisponiveis = {'busca':       ['Otimo', 'Regiao'],
+                                     'algoritmo':  ['PSO', 'HPSO'],
+                                     'inercia':    ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptative-VI'],
                                      'aceleracao': ['TVAC', 'Constante'],
-                                     'Vreinit': ['TVVr-linear', 'Constante'],
-                                     'restricao': [True,False],
-                                     'gbest':['Particula','Enxame']}
-
+                                     'Vreinit':    ['TVVr-linear', 'Constante'],
+                                     'restricao':  [True,False],
+                                     'gbest':      ['Particula','Enxame'],
+                                     'parada':     ['itmax','desviorelativo','evolucaogbest']}
+        # Validações
         for key in metodo.keys():
-            if key not in self.__metodosdisponiveis.keys():
+            # Teste para validar se as chaves definidas existem
+            if key not in self._metodosdisponiveis.keys():
                 raise NameError(u'Keyword {}'.format(key)+u' is not available! Available keywords: '+
-                                ', '.join(self.__metodosdisponiveis.keys())+u'.')
+                                ', '.join(self._metodosdisponiveis.keys())+u'.')
 
-            if not isinstance(metodo[key],str) and key != 'restricao':
-                raise TypeError('Para a chave {} o valor {} deve ser um string'.format(key,metodo[key]))
+            if metodo[key] is not None:
+                # Teste para validar se o conteúdo são strings (exceto para a chave restrição)
+                if not isinstance(metodo[key],str) and key != 'restricao':
+                    raise TypeError('Para a chave {} o valor {} deve ser um string'.format(key,metodo[key]))
 
-            if not isinstance(metodo[key],bool) and key == 'restricao':
-                raise TypeError('Para a chave {} o valor {} deve ser um bool'.format(key,metodo[key]))
+                # Teste para validar se o conteúdo da chave restrição é bool
+                if not isinstance(metodo[key],bool) and key == 'restricao':
+                    raise TypeError('Para a chave {} o valor {} deve ser um bool'.format(key,metodo[key]))
 
-            if metodo[key] not in self.__metodosdisponiveis[key]:
-                raise NameError(u'The value {} is not available for key {}!'.format(metodo[key], key)+u' Available values: '+
-                            ', '.join(self.__metodosdisponiveis[key])+u'.')
+                # Teste para validar se o conteúdo definido está disponível
+                if metodo[key] not in self._metodosdisponiveis[key]:
+                    raise NameError(u'The value {} is not available for key {}!'.format(metodo[key], key)+u' Available values: '+
+                                ', '.join(self._metodosdisponiveis[key])+u'.')
         # -------------------------------------------------------------------------------
         # ATRIBUTOS
         # -------------------------------------------------------------------------------
+        # Atributos cujos valores default que independem de outros:
+        # retrições são por default, ativas
+        self.restricao = metodo.get('restricao') if metodo.get('restricao') is not None else True
+        # critério de parada é, por default, itmax
+        self.parada = metodo.get('parada') if metodo.get('parada') is not None else self._metodosdisponiveis['parada'][0]
+
+        # Atributos cujos valores default que dependem de outros, serão inicializados pelo método InicializacaoDefault:
         self.busca = metodo.get('busca')
         self.algoritmo = metodo.get('algoritmo')
         self.inercia = metodo.get('inercia')
         self.aceleracao = metodo.get('aceleracao')
-        # TODO: em versões futuras, será retirado suporte ao método CFM
-        self.CFM = metodo.get('CFM')
+        # TODO: em versões futuras, será retirado suporte ao método CFM -> após retirada do PSO
+        self.CFM = False
         self.Vreinit = metodo.get('Vreinit')
-        self.restricao = metodo.get('restricao')
         self.gbest = metodo.get('gbest')
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO
         # -------------------------------------------------------------------------------
-        self.Inicializacao()
+        self.InicializacaoDefault()
 
-    def Inicializacao(self):
+    def InicializacaoDefault(self):
         """
-        Validação dos métodos escolhidos e inicialização os valores default.
+        Inicialização dos valores default e validações adicionais.
         """
         # ALGORITMO
         if self.algoritmo is None:
             # se o método de busca for região, então é usado o HPSO, senão PSO
-            if self.busca == self.__metodosdisponiveis['busca'][1]: # regiao
-                self.algoritmo = self.__metodosdisponiveis['algoritmo'][1] # HPSO
+            if self.busca == self._metodosdisponiveis['busca'][1]: # regiao
+                self.algoritmo = self._metodosdisponiveis['algoritmo'][1] # HPSO
             else:
-                self.algoritmo = self.__metodosdisponiveis['algoritmo'][0] # PSO
-
-        # CFM.
-        # TODO: retirar do PSO
-        if self.CFM is None:
-            self.CFM = False  # CFM, conforme apresentado por [7] -> constriction factor method
-
-        elif (self.CFM != True) and (self.CFM != False):
-            raise NameError, u'CFM é suportado no método PSO: True ou False'
-
-        elif ((self.CFM == True) or (self.CFM == False)) and (self.algoritmo == 'HPSO'):
-            raise NameError, u'CFM é suportado no método PSO. Está sendo utilizado o HPSO. Utilzar None'
+                self.algoritmo = self._metodosdisponiveis['algoritmo'][0] # PSO
 
         # INÉRCIA
         if self.inercia is None:
-            # se está sendo utilizado o PSO e a busca é para um ponto ótimo
-            if (self.algoritmo == self.__metodosdisponiveis['algoritmo'][0]) and (self.busca == self.__metodosdisponiveis['busca'][0]):
-                if self.CFM == False:
-                    self.inercia = 'TVIW-linear'  # TVIW-linear, conforme apresentado por [1] e [4] -> standard particle swarm optimization
-                else:
-                    self.inercia = 'Constante'
-            # se a busca é para uma região e não se está usando HPSO
-            elif (self.__metodosdisponiveis['busca'][1]) and (self.algoritmo != self.__metodosdisponiveis['algoritmo'][1]):
-                self.inercia = 'Constante'
+            # se está sendo utilizado o PSO e a busca é para um ponto ótimo, será utilizado o peso de inércia TVIW-linear, caso contrário Constante
+            if (self.algoritmo == self._metodosdisponiveis['algoritmo'][0]) and (self.busca == self._metodosdisponiveis['busca'][0]):
+                    self.inercia = self._metodosdisponiveis['inercia'][0] # TVIW-linear, conforme apresentado por [1] e [4] -> standard particle swarm optimization
+            # se a busca é para uma região e não se está usando HPSO, o peso de inercia será constante
+            elif (self._metodosdisponiveis['busca'][1]) and (self.algoritmo != self._metodosdisponiveis['algoritmo'][1]):
+                self.inercia = self._metodosdisponiveis['inercia'][2]
 
         # se está se usando HPSO, o peso de inércia não deve ser definido
-        elif (self.inercia in self.__metodosdisponiveis['inercia']) and (self.algoritmo == 'HPSO'):
-            raise ValueError(u'O peso de inercia é apenas suportado no PSO. Está sendo utilizado HPSO, não o defina')
+        elif (self.inercia in self._metodosdisponiveis['inercia']) and (self.algoritmo == self._metodosdisponiveis['algoritmo'][1]):
+            raise ValueError('O peso de inercia é apenas suportado no {}. Está sendo utilizado {}, utilize None'.format(self._metodosdisponiveis['algoritmo'][0],self._metodosdisponiveis['algoritmo'][1]))
 
         # ACELERAÇÃO
         if self.aceleracao is None:  # Método para cálculo de C1 e C2
             # se o algoritmo for o PSO, a aceleração será constante
-            if self.algoritmo == self.__metodosdisponiveis['algoritmo'][0]:
-                self.aceleracao = self.__metodosdisponiveis['aceleracao'][1]
-            # se o algoritmo for o HPSO, a aceleração será TVAC ou Constante
-            elif self.algoritmo == self.__metodosdisponiveis['algoritmo'][1]: # HPSO
-                if self.busca == self.__metodosdisponiveis['busca'][0]: # Busca: Ótimo
-                    self.aceleracao = self.__metodosdisponiveis['aceleracao'][0] # C: TVAC
-                elif self.busca == self.__metodosdisponiveis['busca'][1]: # Busca: Regiao
-                    self.aceleracao = self.__metodosdisponiveis['aceleracao'][1] # C: Constante
+            if self.algoritmo == self._metodosdisponiveis['algoritmo'][0]:
+                self.aceleracao = self._metodosdisponiveis['aceleracao'][1] # Constante
+            # se o algoritmo for o HPSO, a aceleração será TVAC (Busca ótimo) ou Constante (Busca Região)
+            elif self.algoritmo == self._metodosdisponiveis['algoritmo'][1]: # HPSO
+                if self.busca == self._metodosdisponiveis['busca'][0]: # Busca: Ótimo
+                    self.aceleracao = self._metodosdisponiveis['aceleracao'][0] # C: TVAC
+                elif self.busca == self._metodosdisponiveis['busca'][1]: # Busca: Regiao
+                    self.aceleracao = self._metodosdisponiveis['aceleracao'][1] # C: Constante
 
         # VELOCIDADE DE REINICIALIZAÇÃO
-        if self.algoritmo == self.__metodosdisponiveis['algoritmo'][1]: # HPSO
+        # se o algoritmo for HPSO, a velocidade de reinicialiação é TVVr-linear
+        if self.algoritmo == self._metodosdisponiveis['algoritmo'][1]: # HPSO
             if self.Vreinit is None:
-                self.Vreinit = self.__metodosdisponiveis['Vreinit'][0] # TVVr-linea
+                self.Vreinit = self._metodosdisponiveis['Vreinit'][0] # TVVr-linear
 
-        if (self.Vreinit != None) and (self.algoritmo != self.__metodosdisponiveis['algoritmo'][1]):
-            raise ValueError(u'Vreinit method is only applied with HPSO algorithm. Do not use it')
-
-        # RESTRIÇÃO
-        if self.restricao is None:
-            self.restricao = True
+        # O método Vreinit só é aplicável para o HPSO
+        if (self.Vreinit is not None) and (self.algoritmo != self._metodosdisponiveis['algoritmo'][1]):
+            raise ValueError('Vreinit method is only applied with {} algorithm. Do not use it'.format(self._metodosdisponiveis['algoritmo'][1]))
 
         # ATUALIZAÇÃO DE GBEST
         if self.gbest is None:
-            if self.busca == self.__metodosdisponiveis['busca'][0]: # Otimo
-                self.gbest = self.__metodosdisponiveis['gbest'][0] # Particula
-            elif self.busca == self.__metodosdisponiveis['busca'][1]: # Regiao
-                self.gbest = self.__metodosdisponiveis['gbest'][1] # Enxame
+            # se está se buscando um ponto ótimo, gbest é atualizado pelas partículas
+            if self.busca == self._metodosdisponiveis['busca'][0]: # Otimo
+                self.gbest = self._metodosdisponiveis['gbest'][0] # Particula
+            # se está se buscando uma região, gbest é atualizado pelo enxame
+            elif self.busca == self._metodosdisponiveis['busca'][1]: # Regiao
+                self.gbest = self._metodosdisponiveis['gbest'][1] # Enxame
+
+        # PARADA
+        if self.parada == self._metodosdisponiveis['parada'][1] and self.algoritmo == self._metodosdisponiveis['algoritmo'][1]:
+            raise ValueError('O critério de parada {} não pode ser usado com o algoritmo {}'.format(self.parada,self.algoritmo))
 
 class PSO:
-    def __init__(self, limite_superior, limite_inferior,
-                 metodo={'busca': 'Otimo', 'algoritmo': 'PSO', 'inercia': 'TVIW-linear', 'aceleracao': 'Constante',
-                         'CFM': False, 'restricao': True, 'gbest': 'Particula'}, Num_particulas=30, itmax=2000,
+    def __init__(self, limite_superior, limite_inferior, metodo={'busca': 'Otimo'}, Num_particulas=30, itmax=2000,
                  **kwargs):
         """
         ************************************
         Partcle Swarm Optimization Algorithm 
         ************************************
+
         Algoritmo para otimização através do enxame de partículas, com suporte ao processamento paralelo rudimentar.
 
         As principais referências utilizadas são [1] a [11]
@@ -471,20 +473,19 @@ class PSO:
         
         **Funçao objetivo**: a função a ser minimizada **DEVE** ser estruturada da seguinte forma: ::
             
-            from threading import Thread
-    
-            class NomeFuncaoObjetivo(Thread):
-                result = 0
-                def __init__(self,parametros,argumentos_extras):
-                    Thread.__init__(self)
-                    self.param = p
-                    self.args  = argumentos_extras
-    
-                def run(self):
-                    
-                    'Calculos utilizado self.param (e self.args, opcionalmente)'
-                    
-                    self.result =  'Resultado da função objetivo (deve ser um float)'
+             >>> from threading import Thread
+             >>>
+             >>> class NomeFuncaoObjetivo(Thread):
+             >>>    result = 0
+             >>>    def __init__(self,parametros,argumentos_extras):
+             >>>        Thread.__init__(self)
+             >>>        self.param = parametros
+             >>>        self.args  = argumentos_extras
+             >>>
+             >>>    def run(self):
+             >>>        #Calculos utilizado self.param (e self.args, opcionalmente)
+             >>>
+             >>>        self.result = float() # Resultado da função objetivo (deve ser um float)
         
         A funçao objetivo deve possuir as seguintes características:
         
@@ -567,12 +568,7 @@ class PSO:
             
                 * ``Constante`` (conteúdo, string):  os fatores de aceleração são assumidos constantes e não variam ao longo das iterações (Vide [4])
                 * ``TVAC`` (*time varying acceleration constant*) (conteúdo, string):  os constantes de aceleraçao variam linearmente ao longo das iterações (Vide [10])
-                
-            * ``CFM`` (chave): define se o método utilizará o *constriction factor method* (Vide [5] e [6])
-            
-                * ``True`` (conteúdo, bool): o CFM é utilizado
-                * ``False`` (conteúdo, bool): o CFM não é utilizado 
-            
+
             * ``restriçao`` (chave): define se os limites de busca serão utilizados como restrições do problema de otimização
             
                 * ``True`` (conteúdo, bool): os limites são utilizados como restrições
@@ -585,14 +581,19 @@ class PSO:
             
             * ``Vreinit`` (chave):  define a forma de tratar a velocidade de reinicilização no algoritmo de HPSO (Vide [10])
             
-                * ``TVVr-linear`` (tiem varying reinitialization velocity : a velocidade de reinicialização decresce linearmente ao longo das iterações
+                * ``TVVr-linear`` (time varying reinitialization velocity) : a velocidade de reinicialização decresce linearmente ao longo das iterações
                 * ``Constante`` a velocidade é mantida constante
+
+            * ``parada`` (chave): define o critério de parada do algoritmo
+
+                * ``itmax``: o algoritmo para se execução quando atinge o número máximo de iterações
+                * ``desviorelativo``: o algoritmo para sua execução quando o desvio relativo dos valores de função objetivo obtidos pelas partículas e o valor de gbest (ponto ótimo) é alcançado. Útil para evitar excessivo número de iterações. Caso o algorimo seja o HPSO, este critério não deve ser utilizado.
                 
         Na definição do método, apenas a chave ``busca`` é obrigatória. Se algumas das restantes não for definida, será assumido valores default. (vide a documentação da classe ``Metodo``)
         
         Caso o método seja omitido, na chamada da função PSO, conforme Exemplo 1, será utilizado o método: ::
         
-        {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'Constante','CFM':False,'restricao':True,'gbest':'Particula'}
+        {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'Constante','restricao':True,'gbest':'Particula','parada':'itmax'}
         
         **Sugestões e recomendações de métodos**:
         
@@ -655,8 +656,9 @@ class PSO:
         * ``posinit_sup`` (lista de mesmo comprimento de ``limite_superior``): valores de **limite superior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior 
         * ``posinit_inf`` (lista de mesmo comprimento de ``limite_inferior``): valores de **limite inferior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior 
         * ``otimo`` (lista): ponto focal quando o método busca utilizado é ``Regiao``. Deve ser uma lista com a mesma dimensão das dimensões de busca
-        
-        **keywargs cujos valores default dependem do método** (Caso não definidas, seus valores serão determinados pelo algoritmo) - vide seção valores default abaixo    
+        * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado)
+
+        **keywargs cujos valores default dependem do método** (Caso não definidas, seus valores serão determinados pelo algoritmo) - vide seção valores default abaixo
 
         * ``w`` (lista com 1 ou 2 elementos OU None): valores de peso de inércia. Caso o método escolhido para **inercia** seja constante, a lista deve conter apenas um elemento. Caso contrário, deve conter os valores iniciais e finais, respectivamente. Obs.: Para o algoritmo de ``HPSO`` ou com peso de inércia `TVIW-random``, ``w = None``
         * ``C1`` (lista com 1 ou 2 elementos): valores do fator de aceleração do coeficiente individual da velocidade. Caso o método escolhido para **aceleracao** seja constante, a lista deve conter apenas um elemento. Caso contrário, deve conter os valores iniciais e finais, respectivamente.           
@@ -667,9 +669,8 @@ class PSO:
         **keywargs com valores default fixos**  (Caso não definidas, seus valores serão determinados pelo algoritmo)
 
         * ``deltaw``: parâmetro para de seleção para o cálculo de w, quando o método do peso de inércia é ``TVIW-Adaptative-VI``. Seu valor default é 0.1. Vide [8] para mais detalhes.
-        * ``k``: parâmetro de ajuste quando o método CFM é utilizado. Seu valor default é 1. Vide [4] para detalhes.
-        * ``gama``: parâmetro de ajuste quando o método CFM é utilizado. Seu valor default é 0.5. Vide [4] e [7]
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
+        * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (limita a quantidade de informações que são salvas). Default: min(itmax,500)
 
         ==========
         Exemplo 3
@@ -736,18 +737,20 @@ class PSO:
                 
         [11] EBERHART, R.; SHI, Y. Comparing inertia weights and constriction factors in particle swarm optimization. In: Proceedings of the 2000 Congress on Evolutionary Computation. CEC00 (Cat. No.00TH8512). IEEE, 2000. v. 1, n. 7, p. 84–88.
         """
+        # TODO: Implementar critérios de parada
+        # TODO: validar os tipos de variáveis de entrada
         global vetor_posicoes, vetor_fitness, vetor_velocidades, best_fitness, gbest
 
         # Verificação se existe keyword não listada
+        keydisponiveis = ['posinit_sup', 'posinit_inf', 'w', 'C1', 'C2', 'Vmax', 'Vreinit', 'otimo', 'deltaw', 'args_model','itmin','n_historico']
         for key in kwargs.keys():
-            if not key in ['posinit_sup', 'posinit_inf', 'w', 'C1', 'C2', 'Vmax', 'Vreinit', 'otimo', 'deltaw', 'k',
-                           'gama', 'args_model']:
-                raise NameError, u'Keyword: %s not available! Available keywords: posinit_sup, posinit_inf, w, C1, C2, Vmax, Vreinit, otimo. Please verify!' % (
-                    key)
+            if not key in keydisponiveis:
+                raise NameError('Keyword: {} not available!'.format(key)+ ' Available keywords: '+','.join(keydisponiveis)+'.')
 
         # Valores default das kwargs (Aquelas que dependem do método escolhido, default = None):
-        posinit_sup = kwargs.get('posinit_sup')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior
-        posinit_inf = kwargs.get('posinit_inf')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior
+        # TODO: atribuir como default up e inf
+        self.posinit_sup = kwargs.get('posinit_sup')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior
+        self.posinit_inf = kwargs.get('posinit_inf')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior
         w = kwargs.get('w')  # Peso de inércia (definido None, pois seu valor default depende do método) (usado no PSO)
         C1 = kwargs.get('C1')  # Fator de aceleração do coeficiente individual (definido None, pois seu valor default depende do método)
         C2 = kwargs.get('C2')  # Fator de aceleração do coeficiente social (definido None, pois seu valor default depende do método)
@@ -756,42 +759,26 @@ class PSO:
         otimo = kwargs.get('otimo')  # Ponto focal para o algoritmo (usado quando o método é definido como 'Regiao')
 
         # Valores default das kwargs (Aquelas que não dependem do método escolhido):
-        deltaw = 0.1  # Parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]
-        k = 1.0  # Utilizado no método CFM | Defaut 1, conforme recomendação de    [4] (Para o método CFM)
-        gama = 0.5  # Utilizado no método CFM | Default 0.5, conforme recomendação de [7] para funções com mínimos locais
-        args_model = []  # Argumentos extras a serem enviados para o modelo
+        self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1  # Parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]
+        self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []  # Argumentos extras a serem enviados para o modelo
+        # TODO: Implementar n_historico
+        # TODO: Implementar itmin - verificar lógica
+        itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else None  # Número mínimo de iterações, caso não definido será 500
+        nhistorico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax]) # tamanho do histórico
 
-        # Sobrecrever os valores default, caso entrado pelo usuário
-
-        if 'deltaw' in kwargs.keys():
-            deltaw = kwargs['deltaw']
-
-        if 'k' in kwargs.keys():
-            k = kwargs['k']
-
-        if 'gama' in kwargs.keys():
-            gama = kwargs['gama']
-
-        if 'args_model' in kwargs.keys():
-            args_model = kwargs['args_model']
+        # TODO: excluir
+        self.k = kwargs.get('k') if kwargs.get('k') is not None else 1.0  # Utilizado no método CFM | Defaut 1, conforme recomendação de    [4] (Para o método CFM)
+        # TODO: excluir
+        self.gama = kwargs.get('gama') if kwargs.get('gama') is not None else 0.5  # Utilizado no método CFM | Default 0.5, conforme recomendação de [7] para funções com mínimos locais
 
         # Inicialização dos métodos - Escrever métodos default, caso não definido pelo usuário
         self.metodo = Metodo(metodo)
-
-        self.args_model = args_model
-
-        # Atribuição a variáveis self, das outras variáveis
-        self.gama = gama
-        self.k = k
-        self.deltaw = deltaw
 
         self.itmax = int(itmax + 1)  # A iteração 0 é a inicialização
         self.Num_particulas = int(Num_particulas)
 
         self.limite_inferior = limite_inferior  # Lista
         self.limite_superior = limite_superior  # Lista
-        self.posinit_sup = posinit_sup          # Lista
-        self.posinit_inf = posinit_inf          # Lista
 
         self.foco = otimo
 
@@ -1352,7 +1339,10 @@ class PSO:
         outfile.write(u'Iterações: %s (1 de inicialização, %s de Busca)' % (self.itmax, self.itmax - 1) + '\n')
         outfile.write('--------------------------------' + '\n')
         outfile.write(u'RESULTADOS' + '\n')
-        outfile.write(u'ótimo: %s | fitness: %s' % (self.gbest, self.best_fitness))
+        outfile.write(u'ótimo: %s | fitness: %s \n' % (self.gbest, self.best_fitness))
+        outfile.write(u'Desvio relativo: %s\n'%(self.desvio_fitness[self.itmax-1]/max([1e-16,self.best_fitness])))
+        outfile.write(u'Desvio: %s\n'%(self.desvio_fitness[self.itmax-1]))
+        outfile.write(u'Fitness: %s\n'%(self.best_fitness))
         outfile.close()
 
     def Graficos(self, base_path=None, **kwargs):
