@@ -348,6 +348,12 @@ class Metodo:
                 raise NameError(u'Keyword {}'.format(key)+u' is not available! Available keywords: '+
                                 ', '.join(self.__metodosdisponiveis.keys())+u'.')
 
+            if not isinstance(metodo[key],str) and key != 'restricao':
+                raise TypeError('Para a chave {} o valor {} deve ser um string'.format(key,metodo[key]))
+
+            if not isinstance(metodo[key],bool) and key == 'restricao':
+                raise TypeError('Para a chave {} o valor {} deve ser um bool'.format(key,metodo[key]))
+
             if metodo[key] not in self.__metodosdisponiveis[key]:
                 raise NameError(u'The value {} is not available for key {}!'.format(metodo[key], key)+u' Available values: '+
                             ', '.join(self.__metodosdisponiveis[key])+u'.')
@@ -495,27 +501,27 @@ class PSO:
             
         * 1 passo: definir a função objetivo em um arquivo (Nome do arquivo aqui utilizado funcaoobjetivo.py) ::
         
-            from threading import Thread
-            
-            class FO(Thread):
-                result = 0
-                def __init__(self,param,args):
-                    Thread.__init__(self)
-                    self.x = param
-    
-                def run(self):
-                    
-                    self.result =  self.x**2
-            
+            >>> from threading import Thread
+            >>>
+            >>> class FO(Thread):
+            >>>    result = 0
+            >>>    def __init__(self,param,args):
+            >>>        Thread.__init__(self)
+            >>>        self.x = param
+            >>>
+            >>>    def run(self):
+            >>>
+            >>>        self.result =  self.x**2
+
         * 2 passo: realizar a otimização ::
             
-                >>> from funcaoobjetivo import FO
-                >>> sup  = [10.]  # limite superior de busca para x
-                >>> inf  = [-10.] # limite inferir de busca para x
-                >>> Otimizacao = PSO(sup,inf) # Criação da classe PSO
-                >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
-                >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
-                >>> Otimizacao.Graficos()     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
+            >>> from funcaoobjetivo import FO
+            >>> sup  = [10.]  # limite superior de busca para x
+            >>> inf  = [-10.] # limite inferir de busca para x
+            >>> Otimizacao = PSO(sup,inf) # Criação da classe PSO
+            >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
+            >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
+            >>> Otimizacao.Graficos()     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
 
         ==========
         Resultados
