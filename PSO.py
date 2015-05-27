@@ -287,7 +287,7 @@ class Metodo:
         Conteúdos disponíveis por chaves:
         =================================
         
-        **Chave obrigatória**
+        **Chaves obrigatórias**
         
         * ``busca``: ``Otimo`` ou ``Regiao``
         
@@ -331,35 +331,58 @@ class Metodo:
         
         * ``gbest``: define como a atualização de ``gbest`` (ponto ótimo) é realizada. Se o método de busca é ``Otimo``, então ``Particula`` . Caso o método de busca seja ``Regiao``, então ``Enxame``.
         '''
+        # -------------------------------------------------------------------------------
+        # VALIDAÇÃO
+        # -------------------------------------------------------------------------------
+        # Métodos disponíveis
+        self.__metodosdisponiveis = {'busca': ['Otimo', 'Regiao'],
+                                     'algoritmo': ['PSO', 'HPSO'],
+                                     'inercia': ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptative-VI'],
+                                     'aceleracao': ['TVAC', 'Constante'],
+                                     'Vreinit': ['TVVr-linear', 'Constante'],
+                                     'restricao': [True,False],
+                                     'gbest':['Particula','Enxame']}
+
+        for key in metodo.keys():
+            if key not in self.__metodosdisponiveis.keys():
+                raise NameError(u'Keyword {}'.format(key)+u' is not available! Available keywords: '+
+                                ', '.join(self.__metodosdisponiveis.keys())+u'.')
+
+            if metodo[key] not in self.__metodosdisponiveis[key]:
+                raise NameError(u'The value {} is not available for key {}!'.format(metodo[key], key)+u' Available values: '+
+                            ', '.join(self.__metodosdisponiveis[key])+u'.')
+        # -------------------------------------------------------------------------------
+        # ATRIBUTOS
+        # -------------------------------------------------------------------------------
         self.busca = metodo.get('busca')
         self.algoritmo = metodo.get('algoritmo')
         self.inercia = metodo.get('inercia')
         self.aceleracao = metodo.get('aceleracao')
+        # TODO: em versões futuras, será retirado suporte ao método CFM
         self.CFM = metodo.get('CFM')
         self.Vreinit = metodo.get('Vreinit')
         self.restricao = metodo.get('restricao')
         self.gbest = metodo.get('gbest')
 
-        for key in metodo.keys():
-            if not key in ['busca', 'algoritmo', 'inercia', 'aceleracao', 'CFM', 'Vreinit', 'restricao', 'gbest']:
-                raise NameError, u'Keyword: %s not available! Available keywords: busca, algoritmo, inercia, aceleracao, CFM, Vreinit, restricao, gbest. Please verify!' % (
-                    key)
+        # -------------------------------------------------------------------------------
+        # INICIALIZAÇÃO
+        # -------------------------------------------------------------------------------
+        self.Inicializacao()
 
     def Inicializacao(self):
-        # Validação da existência dos métodos escolhidos
-
-        if (self.busca != 'Otimo') and (self.busca != 'Regiao'):
-            raise NameError, u'Métodos do PSO: Otimo e Regiao'
-
+        """
+        Validação dos métodos escolhidos e inicialização os valores default.
+        """
+        # ALGORITMO
         if self.algoritmo is None:
-            if self.busca == 'Regiao':
-                self.algoritmo = 'HPSO'
+            # se o método de busca for região, então é usado o HPSO, senão PSO
+            if self.busca == self.__metodosdisponiveis['busca'][1]: # regiao
+                self.algoritmo = self.__metodosdisponiveis['algoritmo'][1] # HPSO
             else:
-                self.algoritmo = 'PSO'
+                self.algoritmo = self.__metodosdisponiveis['algoritmo'][0] # PSO
 
-        if (self.algoritmo != 'PSO') and (self.algoritmo != 'HPSO'):
-            raise NameError, u'É suportado para o algoritmo PSO, HPSO'
-
+        # CFM.
+        # TODO: retirar do PSO
         if self.CFM is None:
             self.CFM = False  # CFM, conforme apresentado por [7] -> constriction factor method
 
@@ -369,57 +392,52 @@ class Metodo:
         elif ((self.CFM == True) or (self.CFM == False)) and (self.algoritmo == 'HPSO'):
             raise NameError, u'CFM é suportado no método PSO. Está sendo utilizado o HPSO. Utilzar None'
 
+        # INÉRCIA
         if self.inercia is None:
-            if (self.algoritmo == 'PSO') and (self.busca == 'Otimo'):
+            # se está sendo utilizado o PSO e a busca é para um ponto ótimo
+            if (self.algoritmo == self.__metodosdisponiveis['algoritmo'][0]) and (self.busca == self.__metodosdisponiveis['busca'][0]):
                 if self.CFM == False:
                     self.inercia = 'TVIW-linear'  # TVIW-linear, conforme apresentado por [1] e [4] -> standard particle swarm optimization
                 else:
                     self.inercia = 'Constante'
-            elif (self.busca == 'Regiao') and (self.algoritmo != 'HPSO'):
+            # se a busca é para uma região e não se está usando HPSO
+            elif (self.__metodosdisponiveis['busca'][1]) and (self.algoritmo != self.__metodosdisponiveis['algoritmo'][1]):
                 self.inercia = 'Constante'
-        elif (self.inercia != 'TVIW-linear') and (self.inercia != 'Constante') and (self.inercia != 'TVIW-random') and (
-                    self.inercia != 'TVIW-Adaptative-VI'):
-            raise NameError, u'É apenas suportado o PSO com w: Constante ou TVIW-linear ou TVIW-random ou TVIW-Adaptative-VI'
 
-        elif ((self.inercia == 'TVIW-linear') or (self.inercia == 'Constante') or (self.inercia == 'TVIW-random') or (
-                    self.inercia == 'TVIW-Adaptative-VI')) and (self.algoritmo == 'HPSO'):
-            raise NameError, u'O peso de inercia é apenas suportado do PSO. Está sendo utilizado HPSO utilizar None'
+        # se está se usando HPSO, o peso de inércia não deve ser definido
+        elif (self.inercia in self.__metodosdisponiveis['inercia']) and (self.algoritmo == 'HPSO'):
+            raise ValueError(u'O peso de inercia é apenas suportado no PSO. Está sendo utilizado HPSO, não o defina')
 
-        elif (self.inercia == 'TVIW-Adaptative-VI') and (self.algoritmo != 'PSO'):
-            raise NameError, u'O peso de inercia TVIW-Adaptative-VI é apenas suportado no PSO.'
-
+        # ACELERAÇÃO
         if self.aceleracao is None:  # Método para cálculo de C1 e C2
-            if (self.algoritmo == 'PSO'):
-                self.aceleracao = 'Constante'
-            elif (self.algoritmo == 'HPSO'):
-                if self.busca == 'Otimo':
-                    self.aceleracao = 'TVAC'
-                elif self.busca == 'Regiao':
-                    self.aceleracao = 'Constante'
-        elif (self.aceleracao != 'Constante') and (self.aceleracao != 'TVAC'):
-            raise NameError, u'É suportado o PSO, HPSO, com aceleração (C1 e C2) constante ou usando TVAC'
+            # se o algoritmo for o PSO, a aceleração será constante
+            if self.algoritmo == self.__metodosdisponiveis['algoritmo'][0]:
+                self.aceleracao = self.__metodosdisponiveis['aceleracao'][1]
+            # se o algoritmo for o HPSO, a aceleração será TVAC ou Constante
+            elif self.algoritmo == self.__metodosdisponiveis['algoritmo'][1]: # HPSO
+                if self.busca == self.__metodosdisponiveis['busca'][0]: # Busca: Ótimo
+                    self.aceleracao = self.__metodosdisponiveis['aceleracao'][0] # C: TVAC
+                elif self.busca == self.__metodosdisponiveis['busca'][1]: # Busca: Regiao
+                    self.aceleracao = self.__metodosdisponiveis['aceleracao'][1] # C: Constante
 
-        if self.algoritmo == 'HPSO':
+        # VELOCIDADE DE REINICIALIZAÇÃO
+        if self.algoritmo == self.__metodosdisponiveis['algoritmo'][1]: # HPSO
             if self.Vreinit is None:
-                self.Vreinit = 'TVVr-linear'
-            elif (self.Vreinit != 'TVVr-linear') and (self.Vreinit != 'Constante'):
-                raise NameError, u'Use TVVr-linear or Constante for the Vreinit method'
-        if (self.Vreinit != None) and (self.algoritmo != 'HPSO'):
-            raise NameError, u'Vreinit method is only applied with HPSO algorithm, please set Vreinit method to None'
+                self.Vreinit = self.__metodosdisponiveis['Vreinit'][0] # TVVr-linea
 
+        if (self.Vreinit != None) and (self.algoritmo != self.__metodosdisponiveis['algoritmo'][1]):
+            raise ValueError(u'Vreinit method is only applied with HPSO algorithm. Do not use it')
+
+        # RESTRIÇÃO
         if self.restricao is None:
             self.restricao = True
-        elif (self.restricao != True) and (self.restricao != False):
-            raise NameError, u'A restrição assume valores lógicos True ou False'
 
+        # ATUALIZAÇÃO DE GBEST
         if self.gbest is None:
-            if self.busca == 'Otimo':
-                self.gbest = 'Particula'
-            elif self.busca == 'Regiao':
-                self.gbest = 'Enxame'
-        elif (self.gbest != 'Particula') and (self.gbest != 'Enxame'):
-            raise NameError, u'É suportado os métodos para gbest: Particula e Enxame'
-
+            if self.busca == self.__metodosdisponiveis['busca'][0]: # Otimo
+                self.gbest = self.__metodosdisponiveis['gbest'][0] # Particula
+            elif self.busca == self.__metodosdisponiveis['busca'][1]: # Regiao
+                self.gbest = self.__metodosdisponiveis['gbest'][1] # Enxame
 
 class PSO:
     def __init__(self, limite_superior, limite_inferior,
@@ -753,7 +771,6 @@ class PSO:
 
         # Inicialização dos métodos - Escrever métodos default, caso não definido pelo usuário
         self.metodo = Metodo(metodo)
-        self.metodo.Inicializacao()
 
         self.args_model = args_model
 
