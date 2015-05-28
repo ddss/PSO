@@ -73,6 +73,7 @@ class Particula(Thread):
 
         global vetor_posicoes, vetor_fitness, vetor_velocidades
 
+        # TODO: reestruturar classe partícula: verificar necessidade de atributos self.
         Thread.__init__(self)
 
         # Atribuição da Função objetivo
@@ -305,7 +306,7 @@ class Metodo:
 
         * ``gbest``: ``Particula`` ou ``Enxame``
 
-        * ``parada``: ``itmax`` ou ``desviorelativo``
+        * ``parada``: ``itmax`` ou ``desviorelativo`` ou ``evolucaogbest``
                 
         ================
         Valores default:
@@ -334,8 +335,8 @@ class Metodo:
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
         # -------------------------------------------------------------------------------
-        # Métodos disponíveis
-        # TODO: terminar evolucaogbest
+        # Métodos disponíveis:
+        # TODO: modificar nome do método 'TVIW-Adaptative-VI' para TVIW-Adaptive-vel
         self._metodosdisponiveis = {'busca':       ['Otimo', 'Regiao'],
                                      'algoritmo':  ['PSO', 'HPSO'],
                                      'inercia':    ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptative-VI'],
@@ -344,7 +345,17 @@ class Metodo:
                                      'restricao':  [True,False],
                                      'gbest':      ['Particula','Enxame'],
                                      'parada':     ['itmax','desviorelativo','evolucaogbest']}
-        # Validações
+
+        # Validações:
+        # O método de busca é obrigatório ser completamente definido
+        if 'busca' not in metodo.keys():
+            raise NameError('A definição do método de busca é obrigatória')
+
+        if metodo['busca'] not in self._metodosdisponiveis['busca']:
+            raise ValueError('É necessário definir um método de busca. Valores disponíveis: '
+                             +', '.join(self._metodosdisponiveis['busca'])+'.')
+
+        # validação dos outros métodos
         for key in metodo.keys():
             # Teste para validar se as chaves definidas existem
             if key not in self._metodosdisponiveis.keys():
@@ -588,6 +599,7 @@ class PSO:
 
                 * ``itmax``: o algoritmo para se execução quando atinge o número máximo de iterações
                 * ``desviorelativo``: o algoritmo para sua execução quando o desvio relativo dos valores de função objetivo obtidos pelas partículas e o valor de gbest (ponto ótimo) é alcançado. Útil para evitar excessivo número de iterações. Caso o algorimo seja o HPSO, este critério não deve ser utilizado.
+                * ``evolucaogbest``: o algoritmo para sua execução quando o gbest não está sendo melhorado. Útil para evitar excessivo número de iterações.
                 
         Na definição do método, apenas a chave ``busca`` é obrigatória. Se algumas das restantes não for definida, será assumido valores default. (vide a documentação da classe ``Metodo``)
         
@@ -656,7 +668,6 @@ class PSO:
         * ``posinit_sup`` (lista de mesmo comprimento de ``limite_superior``): valores de **limite superior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior 
         * ``posinit_inf`` (lista de mesmo comprimento de ``limite_inferior``): valores de **limite inferior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior 
         * ``otimo`` (lista): ponto focal quando o método busca utilizado é ``Regiao``. Deve ser uma lista com a mesma dimensão das dimensões de busca
-        * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado)
 
         **keywargs cujos valores default dependem do método** (Caso não definidas, seus valores serão determinados pelo algoritmo) - vide seção valores default abaixo
 
@@ -671,6 +682,7 @@ class PSO:
         * ``deltaw``: parâmetro para de seleção para o cálculo de w, quando o método do peso de inércia é ``TVIW-Adaptative-VI``. Seu valor default é 0.1. Vide [8] para mais detalhes.
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
         * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (limita a quantidade de informações que são salvas). Default: min(itmax,500)
+        * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 1
 
         ==========
         Exemplo 3
@@ -738,54 +750,122 @@ class PSO:
         [11] EBERHART, R.; SHI, Y. Comparing inertia weights and constriction factors in particle swarm optimization. In: Proceedings of the 2000 Congress on Evolutionary Computation. CEC00 (Cat. No.00TH8512). IEEE, 2000. v. 1, n. 7, p. 84–88.
         """
         # TODO: Implementar critérios de parada
-        # TODO: validar os tipos de variáveis de entrada
         global vetor_posicoes, vetor_fitness, vetor_velocidades, best_fitness, gbest
 
-        # Verificação se existe keyword não listada
-        keydisponiveis = ['posinit_sup', 'posinit_inf', 'w', 'C1', 'C2', 'Vmax', 'Vreinit', 'otimo', 'deltaw', 'args_model','itmin','n_historico']
+        # -------------------------------------------------------------------------------
+        # VALIDAÇÃO
+        # -------------------------------------------------------------------------------
+        # VALIDAÇÕES DE ENTRADAS
+        # Os limites inferior e superior devem ser listas
+        if not isinstance(limite_inferior, list) or not isinstance(limite_superior, list):
+            raise TypeError('Os limites inferiores e superiores devem ser listas.')
+
+        # Os limites inferior e superior devem ter a mesma dimensão
+        if len(limite_inferior) != len(limite_superior):
+            raise NameError('Os limites_superior e limite_inferior devem ter a mesma dimensão')
+
+        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
+        # do limite_inferior e limite_superior
+        if kwargs.get('posinit_sup') is not None:
+            # teste para lista
+            if not isinstance(kwargs.get('posinit_sup'),list):
+                raise TypeError('O limite de inicialização superior posinit_sup deve ser uma lista')
+            # teste de dimensão
+            if len(kwargs.get('posinit_sup')) != len(limite_superior):
+                raise ValueError('O limite de inicialização posinit_sup deve ter a mesma dimensão de limite_superior e limite_inferior')
+
+        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
+        # do limite_inferior e limite_superior
+        if kwargs.get('posinit_inf') is not None:
+            #  teste para lista
+            if not isinstance(kwargs.get('posinit_inf'),list):
+                raise TypeError('O limite de inicialização inferior posinit_inf deve ser uma lista')
+            # teste de dimensão
+            if len(kwargs.get('posinit_inf')) != len(limite_superior):
+                raise ValueError('O limite de inicialização posinit_inf deve ter a mesma dimensão de limite_superior e limite_inferior')
+
+        # teste para avaliar se o limite superior é menor do que  o inferior.
+        for i in xrange(len(limite_superior)):
+            if limite_inferior[i] >= limite_superior[i]:
+                raise ValueError('O limite inferior deve ser menor do que o limite superior para todas as dimensões')
+
+        # VALIDAÇÕES DE KEYWORDS:
+        # keywords disponíveis com seus respectivos tipos
+        # args_model não é validado, pois depende da função sendo minimizada.
+        keydisponiveis = {'posinit_sup':list, 'posinit_inf':list,
+                          'w':list, 'C1':list, 'C2':list,
+                          'Vmax':list, 'Vreinit':list,
+                          'otimo':float, 'deltaw':float,'args_model':None,
+                          'itmin':int, 'n_historico':int}
+
         for key in kwargs.keys():
-            if not key in keydisponiveis:
-                raise NameError('Keyword: {} not available!'.format(key)+ ' Available keywords: '+','.join(keydisponiveis)+'.')
+            # validação se a keyword existe
+            if not key in keydisponiveis.keys():
+                raise NameError('Keyword: {} not available!'.format(key)+ ' Available keywords: '+','.join(keydisponiveis.keys())+'.')
+            # validação de o tipo está correto
+            if kwargs.get(key) is not None and keydisponiveis[key] is not None:
+                if not isinstance(kwargs.get(key),keydisponiveis[key]):
+                    raise TypeError('A chave {} deve ter como conteúdo {}'.format(key,keydisponiveis[key]))
 
-        # Valores default das kwargs (Aquelas que dependem do método escolhido, default = None):
-        # TODO: atribuir como default up e inf
-        self.posinit_sup = kwargs.get('posinit_sup')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior
-        self.posinit_inf = kwargs.get('posinit_inf')  # inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior
-        w = kwargs.get('w')  # Peso de inércia (definido None, pois seu valor default depende do método) (usado no PSO)
-        C1 = kwargs.get('C1')  # Fator de aceleração do coeficiente individual (definido None, pois seu valor default depende do método)
-        C2 = kwargs.get('C2')  # Fator de aceleração do coeficiente social (definido None, pois seu valor default depende do método)
-        Vmax = kwargs.get('Vmax')  # Velocidade máxima do algoritmo
-        Vreinit = kwargs.get('Vreinit')  # Velocidade de reiniciação (usada do HPSO): Vreinit must be a list. Structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]
-        otimo = kwargs.get('otimo')  # Ponto focal para o algoritmo (usado quando o método é definido como 'Regiao')
+        # -------------------------------------------------------------------------------
+        # INICIALIZAÇÃO DO MÉTODO
+        # -------------------------------------------------------------------------------
+        self.metodo = Metodo(metodo)
 
+        # -------------------------------------------------------------------------------
+        # INICIALIZAÇÃO DE ATRIBUTOS CUJOS VALORES DEFAULT SÃO PRÉ-DEFINIDOS
+        # -------------------------------------------------------------------------------
+        # número máximo de iterações
+        self.itmax = int(itmax + 1)  # A iteração 0 é a inicialização
+        # número de partículas
+        self.Num_particulas = int(Num_particulas)
+        # número de parâmetros:  determinado pela dimensão do limite superior
+        self.Num_parametros = len(limite_superior)
+
+        # limite inferior de busca
+        self.limite_inferior = [float(lim) for lim in limite_inferior]  # Lista
+        # limite superior de busca
+        self.limite_superior = [float(lim) for lim in limite_superior]  # Lista
+        # ponto focal do algoritmo - quando o método de busca é Regiao ele subsitui gbest
+        self.foco = kwargs.get('otimo')
+
+        # TRATAMENTO DAS KWARGS:
         # Valores default das kwargs (Aquelas que não dependem do método escolhido):
-        self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1  # Parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]
-        self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []  # Argumentos extras a serem enviados para o modelo
+        # posições de inicialização do algoritmo - limite superior:
+        self.posinit_sup = kwargs.get('posinit_sup') if kwargs.get('posinit_sup') is not None else limite_superior
+        # posições de inicialização do algoritmo - limite inferior:
+        self.posinit_inf = kwargs.get('posinit_inf') if kwargs.get('posinit_inf') is not None else limite_inferior
+         # Parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]:
+        self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
+        # Argumentos extras a serem enviados para o modelo:
+        self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
         # TODO: Implementar n_historico
-        # TODO: Implementar itmin - verificar lógica
-        itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else None  # Número mínimo de iterações, caso não definido será 500
-        nhistorico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax]) # tamanho do histórico
+        # TODO: Implementar itmin
+        # Número mínimo de iterações, caso não definido será 1
+        itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else 1
+        # tamanho do histórico
+        nhistorico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
 
         # TODO: excluir
         self.k = kwargs.get('k') if kwargs.get('k') is not None else 1.0  # Utilizado no método CFM | Defaut 1, conforme recomendação de    [4] (Para o método CFM)
         # TODO: excluir
         self.gama = kwargs.get('gama') if kwargs.get('gama') is not None else 0.5  # Utilizado no método CFM | Default 0.5, conforme recomendação de [7] para funções com mínimos locais
 
-        # Inicialização dos métodos - Escrever métodos default, caso não definido pelo usuário
-        self.metodo = Metodo(metodo)
+        # -------------------------------------------------------------------------------
+        # INICIALIZAÇÃO DE ATRIBUTOS CUJOS VALORES DEFAULT DEPENDEM DO MÉTODO
+        # -------------------------------------------------------------------------------
+        # default: None
+        w = kwargs.get('w')    # Peso de inércia (definido None, pois seu valor default depende do método) (usado no PSO)
+        C1 = kwargs.get('C1')  # Fator de aceleração do coeficiente individual (definido None, pois seu valor default depende do método)
+        C2 = kwargs.get('C2')  # Fator de aceleração do coeficiente social (definido None, pois seu valor default depende do método)
+        Vmax = kwargs.get('Vmax')  # Velocidade máxima do algoritmo
+        Vreinit = kwargs.get('Vreinit')  # Velocidade de reiniciação (usada do HPSO): Vreinit must be a list. Structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]
 
-        self.itmax = int(itmax + 1)  # A iteração 0 é a inicialização
-        self.Num_particulas = int(Num_particulas)
+        # inicialização dos valores default de w, C1 e C2 e criação dos atributos
+        self.__defaultCoeficientes(w, C1, C2)
+        self.__defaultVelocidades(Vmax, Vreinit)
 
-        self.limite_inferior = limite_inferior  # Lista
-        self.limite_superior = limite_superior  # Lista
-
-        self.foco = otimo
-
-        self.default(w, C1, C2)
-        self.inicializacao(Vmax, Vreinit)
-
-    def default(self, w, C1, C2):
+    def __defaultCoeficientes(self, w, C1, C2):
         '''
         Subrotina para definição dos valores default para o PESO DE INÉRCIA E FATOR DE ACELERAÇÃO
         
@@ -793,7 +873,7 @@ class PSO:
         Peso de inércia
         ===============
         
-        * Se o método para cálculo do peso de inércia é ``Constante``, sem CFM, ``w = [0.9]``, com CFM, ``w = [0.729]``. 
+        * Se o método para cálculo do peso de inércia é ``Constante``, w = [0.9].
         * Se o método para cálculo do peso de inércia é ``TVIW-linear``, ``w = [0.9,0.4]``
         * Se o método para cálculo do peso de inércia é  ``TVIW-random``, ``w = None``
         * Se o método para cálculo do peso de inércia é  ``TVIW-Adaptative-VI``, ``w = [0.9,0.3]``
@@ -802,7 +882,7 @@ class PSO:
         Fator de aceleração individual
         ================================
         
-        * Se o método para cálculo dos fatores de aceleração é ``Constante``, sem CFM, ``C1 = [2.0]``, com CFM, ``C1 = [2.025]``. 
+        * Se o método para cálculo dos fatores de aceleração é ``Constante``, ``C1 = [2.0]``.
         * Se o método para cálculo dos fatores de aceleração é ``TVAC``, ``C1 = [2.5,0.5]`` . 
         * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-VI``, ``C1 = [1.49]`` . 
 
@@ -810,105 +890,104 @@ class PSO:
         Fator de aceleração social
         ================================
         
-        * Se o método para cálculo dos fatores de aceleração é ``Constante``, sem CFM, ``C1 = [2.0]``, com CFM, ``C1 = [2.025]``. 
+        * Se o método para cálculo dos fatores de aceleração é ``Constante`` ``C1 = [2.0]``.
         * Se o método para cálculo dos fatores de aceleração é ``TVAC``, ``C1 = [0.5,2.5]`` . 
         * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-VI``, ``C1 = [1.49]`` . 
         
         **Observe que NEM todas as combinações de métodos possuem valores *default* de parâmetros. Use com cautela**
         '''
-        # Definição de valores default para w, C1, C2, caso não definidos pelo usuário:
-
-        if self.metodo.inercia == 'Constante':
-            if w is None:
-                if self.metodo.CFM == False:
-                    self.wi = 0.9  # Conforme valor recomendado por [4]
-                else:
-                    self.wi = 0.729
-            elif size(w) == 1:
-                self.wi = w[0]
-            else:
-                raise NameError, u'w deve ser uma lista de 1 valor, visto que o método para w é constante'
-
-        elif self.metodo.inercia == 'TVIW-linear':
-            if w is None:
+        # TODO: usar listas para salvar w, C1 e C2 (e não mais duas variáveis)
+        # -------------------------------------------------------------------------------
+        # PESO DE INÉRCIA
+        # -------------------------------------------------------------------------------
+        if w is None:
+            if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0]: # TVIW-linear
                 self.wi = 0.9  # Conforme valor recomendado por [4]
                 self.wf = 0.4  # Conforme valor recomendado por [4]
-            elif size(w) == 2:
-                self.wi = w[0]
-                self.wf = w[1]
-            else:
-                raise NameError, u'w deve ser uma lista de 2 valores, visto que o método para w é TVIW-linear'
-
-        elif self.metodo.inercia == 'TVIW-random':
-            if w is None:
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
                 self.wi = None  # Valor não será necessário. W é aleatório
-            else:
-                raise NameError, u'w deve ser None, pois varia aleatoriamente'
-
-        elif self.metodo.inercia == 'TVIW-Adaptative-VI':
-            if w is None:
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][2]: # Constante
+                self.wi = 0.9 # Conforme valor recomendado por [4]
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: #TVIW-Adaptive-vel
                 self.wi = 0.9  # Conforme valor recomendado por [8]
                 self.wf = 0.3  # Conforme valor recomendado por [8]
-            elif size(w) == 2:
-                self.wi = w[0]
-                self.wf = w[1]
-            else:
-                raise NameError, u'w deve ser uma lista de 2 valores, visto que o método para w é TVIW-Adaptative-VI'
+            elif self.metodo.inercia is None:
+                self.wi = None
+        else:
+            if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0] or self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]:
+                if len(w) == 2:
+                    self.wi = w[0]
+                    self.wf = w[1]
+                else:
+                    raise ValueError('w deve ser uma lista de 2 valores, visto que o método para w é {}'.format(self.metodo.inercia))
 
-        elif self.metodo.inercia is None:
-            self.wi = None
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
+                if w is None:
+                    self.wi = None  # Valor não será necessário. W é aleatório
+                else:
+                    raise ValueError('w deve ser None, pois varia aleatoriamente, visto que o método para w é {}'.format(self.metodo.inercia))
 
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][2]: # Constante
+                if len(w) == 1:
+                    self.wi = w[0]
+                else:
+                    raise ValueError('w deve ser uma lista de 1 valor, visto que o método para w é {}'.format(self.metodo.inercia))
+            elif self.metodo.inercia is None:
+                self.wi = None
+
+        # -------------------------------------------------------------------------------
+        # COEFICIENTE DE ACELERAÇÃO DO TERMO COGNITIVO
+        # -------------------------------------------------------------------------------
         if C1 is None:
-            if (self.metodo.algoritmo == 'PSO') or (self.metodo.algoritmo == 'HPSO'):
-                if self.metodo.aceleracao == 'TVAC':
+            if (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][0]) or\
+                    (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]):
+                if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
                     self.C1i = 2.5  # Default 2.5, conforme recomendado por [10]
                     self.C1f = 0.5  # Default 0.5, conforme recomendado por [10]
-                elif self.metodo.inercia == 'TVIW-Adaptative-VI':
+                elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: # inercia: TVIW-Adaptive-vel
                     self.C1i = 1.49
                 else:
-                    if self.metodo.CFM == False:
-                        self.C1i = 2.0  # Default 2, conforme recomendado por [4]
-                    else:
-                        self.C1i = 2.025  # Default 2.025, conforme recomendado por [7] para função com mínimos locais
+                    self.C1i = 2.0  # Default 2, conforme recomendado por [4]
         else:
-            if self.metodo.aceleracao == 'TVAC':
-                if size(C2) == 2:
+            if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
+                if len(C2) == 2:
                     self.C1i = C1[0]
                     self.C1f = C1[1]
                 else:
-                    raise NameError, u'C2 deve ser uma lista de 2 valores para usar o método TVAC'
+                    raise ValueError('C1 deve ser uma lista de 2 valores para usar o método {}'.format(self.metodo.aceleracao))
             else:
-                if size(C1) == 1:
+                if len(C1) == 1:
                     self.C1i = C1[0]
                 else:
-                    raise NameError, u'C1 deve ser uma lista de 1 valor para usar o método constante'
+                    raise ValueError('C1 deve ser uma lista de 1 valor para usar o método {}'.format(self.metodo.aceleracao))
 
+        # ------------------------------------------------------------------------------
+        # COEFICIENTE DE ACELERAÇÃO DO TERMO SOCIAL
+        # ------------------------------------------------------------------------------
         if C2 is None:
-            if (self.metodo.algoritmo == 'PSO') or (self.metodo.algoritmo == 'HPSO'):
-                if self.metodo.aceleracao == 'TVAC':
+            if (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][0]) or\
+                    (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]):
+                if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
                     self.C2i = 0.5  # Default 0.5, conforme recomendado por [10]
                     self.C2f = 2.5  # Default 2.5, conforme recomendado por [10]
-                elif self.metodo.inercia == 'TVIW-Adaptative-VI':
+                elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: # inercia: TVIW-Adaptive-vel
                     self.C2i = 1.49
                 else:
-                    if self.metodo.CFM == False:
                         self.C2i = 2.0  # Default 2, conforme recomendado por [4]
-                    else:
-                        self.C2i = 2.025  # Default 2.025, conforme recomendado por [7] para função com mínimos locais
         else:
-            if self.metodo.aceleracao == 'TVAC':
-                if size(C2) == 2:
+            if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
+                if len(C2) == 2:
                     self.C2i = C2[0]
                     self.C2f = C2[1]
                 else:
-                    raise NameError, u'C2 deve ser uma lista de 2 valores para usar o método TVAC'
+                    raise ValueError('C2 deve ser uma lista de 2 valores para usar o método {}'.format(self.metodo.aceleracao))
             else:
-                if size(C2) == 1:
+                if len(C2) == 1:
                     self.C2i = C2[0]
                 else:
-                    raise NameError, u'C2 deve ser uma lista de 1 valor para usar o método constante'
+                    raise ValueError('C2 deve ser uma lista de 1 valor para usar o método {}'.format(self.metodo.aceleracao))
 
-    def inicializacao(self, Vmax, Vreinit):
+    def __defaultVelocidades(self, Vmax, Vreinit):
         '''
         Subrotina para inicialização das VELOCIDADES MÁXIMAS e de REINICIALIZAÇÃO, incluindo seus valores *default*. Validação dos limites de busca.
 
@@ -917,7 +996,6 @@ class PSO:
         ===================
 
         * A velocidade máxima é mantida no range do problema
-        * Caso o CFM seja utilizado, este é ``gama`` vezes o range do problema.
 
         =============================
         Velocidade de reinicialização
@@ -926,80 +1004,61 @@ class PSO:
         *  Se o método para ``Vreinit`` for ``Constante``, a velocidade de reinicialização é inicializada em Vmax, com ``final_percentage`` igual a 1
         *  Se o método para ``Vreinit`` for ``TVVr-linear``, a velocidade de reinicialização é inicializada em Vmax, com ``final_percentage`` igual a 0.1
         '''
-
-        # Validação dos limite inferior e superior
-        if size(self.limite_inferior) != size(self.limite_superior):
-            raise NameError, u'Os limites (de restrição em caixa) devem ter a mesma dimensão'
-
-        self.Num_parametros = size(self.limite_superior)  # O número de parâmetros é determinado pela dimensão do limite superior e inferior
-
-        if self.posinit_sup is not None:
-            if size(self.posinit_sup) != self.Num_parametros:
-                raise NameError, u'O limite de inicialização posinit_sup deve ter a mesma dimensão dos limites de restrição em caixa'
-
-        if self.posinit_inf is not None:
-            if size(self.posinit_inf) != self.Num_parametros:
-                raise NameError, u'O limite de inicialização posinit_inf deve ter a mesma dimensão dos limites de restrição em caixa'
-
-        # Forçando os limites a serem floats
-        self.limite_inferior = [float(lim) for lim in self.limite_inferior]
-        self.limite_superior = [float(lim) for lim in self.limite_superior]
-
-        # teste para avaliar se o limite superior é menor do que  o inferior.
-        testelimite = [self.limite_inferior[i] >= self.limite_superior[i] for i in xrange(self.Num_parametros)]
-
-        if True in testelimite:
-            raise ValueError, u'o limite inferior deve ser menor do que o limite superior para todas as dimensões'
-
-        # Cálculo do módulo da velocidade máxima e validação
+        # ------------------------------------------------------------------------------
+        # VELOCIDADE MÁXIMA
+        # ------------------------------------------------------------------------------
         if Vmax is None:
-            self.Vmax = [0] * self.Num_parametros
-            for i in xrange(self.Num_parametros):
-                if self.metodo.algoritmo == 'PSO':
-                    if self.metodo.CFM == False:
-                        self.Vmax[i] = max((abs(self.limite_inferior[i]), abs(self.limite_superior[i])))  # Conforme [4], Vmax é mantido no limite dinâmico do problema
-                    else:
-                        self.Vmax[i] = self.gama * max((abs(self.limite_inferior[i]), abs(self.limite_superior[i])))  # Conforme [7], Vmax é o limite dinâmico do problema vezes gama
-                elif self.metodo.algoritmo == 'HPSO':
-                    self.Vmax[i] = max((abs(self.limite_inferior[i]), abs(
-                        self.limite_superior[i])))  # Conforme [10], Vmax é mantido no range dinâmico do problema
+            # Conforme [4], Vmax é mantido no limite dinâmico do problema
+            self.Vmax = [max([abs(self.limite_inferior[i]), abs(self.limite_superior[i])]) for i in xrange(self.Num_parametros)]
         else:
-            if size(Vmax) == self.Num_parametros:
+            if len(Vmax) == self.Num_parametros:
                 self.Vmax = Vmax
             else:
-                raise NameError, u'Vmax deve ter a mesma dimensão do limite_inferior e limite_superior'
+                raise ValueError('Vmax deve ter a mesma dimensão do limite_inferior e limite_superior')
 
-        # Cálculo da velocidade de reinicialização para o HPSO
-        if self.metodo.algoritmo == 'HPSO':
-            if (Vreinit is not None) and not isinstance(Vreinit, list):
-                raise NameError, u'Vreinit must be a list. Structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]'
-            if (Vreinit is not None) and not isinstance(Vreinit[0], list):
-                raise NameError, u'The first value of Vreinit list must be another list. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]'
-            if self.metodo.Vreinit == 'Constante':
+        # ------------------------------------------------------------------------------
+        # VELOCIDADE DE REINICIALIZAÇÃO - HPSO
+        # ------------------------------------------------------------------------------
+        if self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]: # HPSO
+
+            if Vreinit is not None:
+
+                if len(Vreinit) != 2:
+                    raise ValueError('Vreinit must be a list with 2 elements. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]')
+
+                if not isinstance(Vreinit[0], list):
+                    raise ValueError('The first value of Vreinit list must be another list with the same size of parameters number. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]')
+
+                if len(Vreinit[0]) != self.Num_parametros:
+                    raise ValueError('The first value of Vreinit list must be another list with the same size of parameters number. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]')
+
+                if not isinstance(Vreinit[1], float):
+                    raise ValueError('The second value of Vreinit list must be a float between 0 and 1. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]')
+
+                if not 0 < Vreinit[1] <= 1:
+                    raise ValueError('The second value of Vreinit list must be a float between 0 and 1. Vreinit structure: [[Vreinit_1st_param,Vreinit_2nd_param,...],final_percentage]')
+
+            if self.metodo.Vreinit == self.metodo._metodosdisponiveis['Vreinit'][1]: # Constante
                 if Vreinit is None:
                     self.Vreinit_init = [self.Vmax, 1.0]  # Conforme [10], a velocidade de reinicialização é mantida em Vmax
                 else:
-                    if size(Vreinit[0]) == self.Num_parametros:
+                    if Vreinit[1] == 1.0:
                         self.Vreinit_init = Vreinit
                     else:
-                        raise NameError, u'The first list of Vreinit must contain a reinitialization velocity for each paramater'
+                        raise ValueError('The porcentage must be 1 for Vreinit, because the method chosen is {}'.format(self.metodo.Vreinit))
 
-                    if (Vreinit[1]) != 1.0:
-                        raise NameError, u'The porcentage must be 1 for Vreinit, because the method chosen is Constant'
-
-            if self.metodo.Vreinit == u'TVVr-linear':
+            elif self.metodo.Vreinit == self.metodo._metodosdisponiveis['Vreinit'][0]:
                 if Vreinit is None:
                     self.Vreinit_init = [self.Vmax, 0.1]  # Conforme [10], a velocidade de reinicialização inicial é Vmax e decresce linearmente até 10% deste valor
                 else:
-                    if size(Vreinit[0]) == self.Num_parametros:
-                        self.Vreinit_init = Vreinit
-                    else:
-                        raise NameError, u'The first list of Vreinit must contain a reinitialization velocity for each paramater'
+                     self.Vreinit_init = Vreinit
 
         else:
             self.Vreinit = None  # Não é utilizada pelos demais métodos
 
-        # Cálculo da velocidade de inicio -> TVIW-Adaptative-VI:
+        # ------------------------------------------------------------------------------
+        # VELOCIDADE DE INICIALIZAÇÃO - TVIW-Adaptivel
+        # ------------------------------------------------------------------------------
         self.Vstart = abs((max(self.limite_superior) - min(self.limite_inferior)) / 2.0)
         self.Tend = 0.95 * self.itmax
 
@@ -1036,7 +1095,7 @@ class PSO:
 
         # FO: função objetivo -> tem DE ser uma classe herdando os atributos da classe Thread, os resultados tem
         # DE ser um número REAL, sendo disponibilizados em método result (FO.result).
-
+        # TODO: colocar esta validação em __init__
         if (self.itmax - 1) == 1 and (self.metodo.inercia == 'TVIW-linear' or self.metodo.aceleracao == 'TVAC'):
             raise ValueError, u'Para os métodos de peso de inércia e aceleraçao com variaçao linear (TVIW-linear e TVAC), o número de iterações deve ser, no mínimo, 2'
 
@@ -1120,6 +1179,7 @@ class PSO:
                 ID_particle += 1
 
         # validação:  gbest foi definido para o método de busca Regiao
+        # TODO: colocar esta validação em __init__
         if self.metodo.busca == 'Regiao':
             if self.foco is None:
                 raise ValueError, u'É necessário informar o valor de um ponto ótimo da função'

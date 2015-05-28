@@ -13,8 +13,8 @@ inf = [-32,-32] # minimum value for the parameters
 args_model=['rastrigin'] # In this example, the Modelo class needs another argument: the name of the function to be minimized
 
 # PSO Algorithm executed with decreasing inercia weight from 0.9 to 0.4; acceleration factors constant and equal to default values of 2; 30 particles and 200 iterations.
-Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'Constante','restricao':True},\
-Num_particulas=30,itmax=1000,w=[0.9,0.4],args_model=args_model)
+Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'HPSO','aceleracao':'Constante','restricao':True},\
+Num_particulas=30,itmax=10,w=[0.9],args_model=args_model)
 # Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'HPSO','gbest':'Particula','parada':'itmax','inercia':'Constante'},\
 # Num_particulas=30,itmax=100,w=[0.9,0.4],args_model=args_model)
 Otimizacao.Busca(Modelo,printit=True) # Do the search
