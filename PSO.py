@@ -18,9 +18,6 @@ Fatores de aceleração suportados (Acceleration factors supported):
 - Constante
 - TVAC                - time variating acceleration coefficientes (linear)
 
-- Constriction factor method:
-- CFM                 - constriction factor method
-
 Reinitialization velocity for HPSO:
 - TVVr-linear         - time variating reinitialization velocity (linear)
 - Constante
@@ -68,10 +65,10 @@ class Particula(Thread):
     qsi = 0
     pbest = 0
 
-    def __init__(self, FO, w, C1, C2, k, Vmax, Vreinit, it, num_parametros, num_particulas, metodo, limite_superior,
+    def __init__(self, FO, w, C1, C2, Vmax, Vreinit, it, num_parametros, num_particulas, metodo, limite_superior,
                  limite_inferior, ID_particle, args_model=[]):
 
-        global vetor_posicoes, vetor_fitness, vetor_velocidades
+        global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest
 
         # TODO: reestruturar classe partícula: verificar necessidade de atributos self.
         Thread.__init__(self)
@@ -84,15 +81,11 @@ class Particula(Thread):
         self.__w = w
         self.__C1 = C1
         self.__C2 = C2
-        self.__k = k
         self.Vmax = Vmax
         self.V_reinit = Vreinit
         self.__it = it
         self.__args_model = args_model
 
-        self.__vetor_posicoes = vetor_posicoes
-        self.__vetor_fitness = vetor_fitness
-        self.__vetor_velocidades = vetor_velocidades
         self.__num_particulas = num_particulas
         self.__num_parametros = num_parametros
 
@@ -104,8 +97,8 @@ class Particula(Thread):
 
         # Determinação da posição atual da partícula, velocidade inicial (PSO) e pbest 
 
-        self.posicao = copy(self.__vetor_posicoes[self.__it - 1][self.ID_particle]) # Posição da partícula
-        self.Vo = copy(self.__vetor_velocidades[self.__it - 1][self.ID_particle])   # Velocidade na iteração anterior
+        self.posicao = copy(vetor_posicoes[self.__it - 1][self.ID_particle]) # Posição da partícula
+        self.Vo = copy(vetor_velocidades[self.__it - 1][self.ID_particle])   # Velocidade na iteração anterior
         self.posicao = self.posicao.tolist()
         # Correção de self.posicao e self.Vo
         if isinstance(self.Vo[0].tolist(), list):
@@ -114,16 +107,7 @@ class Particula(Thread):
             self.posicao = self.posicao[0].tolist()
 
         # Busca pela melhor posição desta partícula:
-        vetor_fitness_particula = []
-        vetor_posicoes_particula = []
-
-        for i in xrange(1, self.__it + 1):
-            vetor_fitness_particula.append(self.__vetor_fitness[i - 1][self.ID_particle])
-            vetor_posicoes_particula.append(self.__vetor_posicoes[i - 1][self.ID_particle])
-
-        best_position = argmin(vetor_fitness_particula)
-
-        self.pbest = vetor_posicoes_particula[best_position]  # Posição para a qual a partícula obteve o melhor fitness
+        self.pbest = vetor_pbest[0][self.ID_particle] # Posição para a qual a partícula obteve o melhor fitness
 
     def Fitness_Particula(self):
         # Cálculo do Fitness da partícula
@@ -144,18 +128,7 @@ class Particula(Thread):
         vel1 = [Vo * (self.__w) for Vo in self.Vo]
         vel2 = [self.__C1 * R1[j] * (self.pbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
         vel3 = [self.__C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
-
-        if self.metodo.CFM == False:
-            vel4 = [vel1[j] + vel2[j] + vel3[j] for j in xrange(self.__num_parametros)]
-        else:
-            self.phi = self.__C1 + self.__C2
-
-            if self.phi > 4.0:
-                self.qsi = 2 * self.__k / (self.phi - 2 + sqrt(self.phi ** 2 - 4.0 * self.phi))
-            else:
-                self.qsi = self.__k
-
-            vel4 = [self.qsi * (vel1[j] + vel2[j] + vel3[j]) for j in xrange(self.__num_parametros)]
+        vel4 = [vel1[j] + vel2[j] + vel3[j] for j in xrange(self.__num_parametros)]
 
         if self.metodo.inercia != 'TVIW-Adaptative-VI':
             # Verificação se a velocidade calculada é menor que Vmax, para cada dimensão
@@ -228,7 +201,7 @@ class Particula(Thread):
 
     def Armazenamento(self):
 
-        global vetor_posicoes, vetor_velocidades, vetor_fitness, best_fitness, gbest, Controle_variaveis
+        global vetor_posicoes, vetor_velocidades, vetor_fitness, vetor_pbest, best_fitness, gbest, Controle_variaveis
 
         # Método para verificar se haverá mudança em gbest
 
@@ -239,6 +212,10 @@ class Particula(Thread):
         vetor_posicoes[self.__it][self.ID_particle] = self.posicao
         vetor_velocidades[self.__it][self.ID_particle] = self.velocidade
         vetor_fitness[self.__it][self.ID_particle] = self.fitness
+
+        # atualizando pbest
+        if self.fitness < vetor_pbest[1][self.ID_particle]:
+            vetor_pbest[0][self.ID_particle] = self.posicao
 
         # Teste para verificar mudança no mínimo global:
         if self.metodo.gbest == 'Particula':
@@ -389,8 +366,6 @@ class Metodo:
         self.algoritmo = metodo.get('algoritmo')
         self.inercia = metodo.get('inercia')
         self.aceleracao = metodo.get('aceleracao')
-        # TODO: em versões futuras, será retirado suporte ao método CFM -> após retirada do PSO
-        self.CFM = False
         self.Vreinit = metodo.get('Vreinit')
         self.gbest = metodo.get('gbest')
 
@@ -565,7 +540,7 @@ class PSO:
             
             * ``algoritmo`` (chave): define o tipo de algoritmo a ser utilizado
                 
-                * ``PSO`` (Particle Swarm Optimization) (conteúdo, string): algoritmo de PSO com peso de inércia, fatores de aceleração, e suporte ao método CFM (constriction factor method)
+                * ``PSO`` (Particle Swarm Optimization) (conteúdo, string): algoritmo de PSO com peso de inércia, fatores de aceleração
                 * ``HPSO`` (Self-Organizing Hierarchical Particle Swarm Optimizer) (conteúdo, string): executa um método de PSO assumindo peso de inércia zero e reiniciando as partículas quando suas velocidades são zero.
             
             * ``inercia``: define como o algoritmo calcula o peso de inércia
@@ -651,7 +626,7 @@ class PSO:
                 >>> from funcaoobjetivo import FO
                 >>> sup  = [10.]  # limite superior de busca para x
                 >>> inf  = [-10.] # limite inferior de busca para x
-                >>> metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'TVAC','CFM':False,'restricao':False,'gbest':'Particula'}
+                >>> metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'TVAC','restricao':False,'gbest':'Particula'}
                 >>> Otimizacao = PSO(sup,inf,metodo,35,1000) # Criação da classe PSO
                 >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
                 >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
@@ -693,7 +668,7 @@ class PSO:
                 >>> from funcaoobjetivo import FO
                 >>> sup  = [10.]  # limite superior de busca para x
                 >>> inf  = [-10.] # limite inferior de busca para x
-                >>> metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'TVAC','CFM':False,'restricao':False,'gbest':'Particula'}
+                >>> metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'TVAC','restricao':False,'gbest':'Particula'}
                 >>> w  = [0.9,0.3] # valores do peso de inércia
                 >>> C1 = [2.5,0.5] # valores do fator individual de aceleração de aceleração 
                 >>> C2 = [0.5,2.5] # valores do fator social de aceleração de aceleração 
@@ -750,7 +725,6 @@ class PSO:
         [11] EBERHART, R.; SHI, Y. Comparing inertia weights and constriction factors in particle swarm optimization. In: Proceedings of the 2000 Congress on Evolutionary Computation. CEC00 (Cat. No.00TH8512). IEEE, 2000. v. 1, n. 7, p. 84–88.
         """
         # TODO: Implementar critérios de parada
-        global vetor_posicoes, vetor_fitness, vetor_velocidades, best_fitness, gbest
 
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
@@ -764,38 +738,13 @@ class PSO:
         if len(limite_inferior) != len(limite_superior):
             raise NameError('Os limites_superior e limite_inferior devem ter a mesma dimensão')
 
-        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
-        # do limite_inferior e limite_superior
-        if kwargs.get('posinit_sup') is not None:
-            # teste para lista
-            if not isinstance(kwargs.get('posinit_sup'),list):
-                raise TypeError('O limite de inicialização superior posinit_sup deve ser uma lista')
-            # teste de dimensão
-            if len(kwargs.get('posinit_sup')) != len(limite_superior):
-                raise ValueError('O limite de inicialização posinit_sup deve ter a mesma dimensão de limite_superior e limite_inferior')
-
-        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
-        # do limite_inferior e limite_superior
-        if kwargs.get('posinit_inf') is not None:
-            #  teste para lista
-            if not isinstance(kwargs.get('posinit_inf'),list):
-                raise TypeError('O limite de inicialização inferior posinit_inf deve ser uma lista')
-            # teste de dimensão
-            if len(kwargs.get('posinit_inf')) != len(limite_superior):
-                raise ValueError('O limite de inicialização posinit_inf deve ter a mesma dimensão de limite_superior e limite_inferior')
-
-        # teste para avaliar se o limite superior é menor do que  o inferior.
-        for i in xrange(len(limite_superior)):
-            if limite_inferior[i] >= limite_superior[i]:
-                raise ValueError('O limite inferior deve ser menor do que o limite superior para todas as dimensões')
-
         # VALIDAÇÕES DE KEYWORDS:
         # keywords disponíveis com seus respectivos tipos
         # args_model não é validado, pois depende da função sendo minimizada.
         keydisponiveis = {'posinit_sup':list, 'posinit_inf':list,
                           'w':list, 'C1':list, 'C2':list,
                           'Vmax':list, 'Vreinit':list,
-                          'otimo':float, 'deltaw':float,'args_model':None,
+                          'otimo':list, 'deltaw':float,'args_model':None,
                           'itmin':int, 'n_historico':int}
 
         for key in kwargs.keys():
@@ -806,6 +755,30 @@ class PSO:
             if kwargs.get(key) is not None and keydisponiveis[key] is not None:
                 if not isinstance(kwargs.get(key),keydisponiveis[key]):
                     raise TypeError('A chave {} deve ter como conteúdo {}'.format(key,keydisponiveis[key]))
+
+        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
+        # do limite_inferior e limite_superior
+        if kwargs.get('posinit_sup') is not None:
+            # teste de dimensão
+            if len(kwargs.get('posinit_sup')) != len(limite_superior):
+                raise ValueError('O limite de inicialização posinit_sup deve ter a mesma dimensão de limite_superior e limite_inferior')
+
+        # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
+        # do limite_inferior e limite_superior
+        if kwargs.get('posinit_inf') is not None:
+            # teste de dimensão
+            if len(kwargs.get('posinit_inf')) != len(limite_superior):
+                raise ValueError('O limite de inicialização posinit_inf deve ter a mesma dimensão de limite_superior e limite_inferior')
+
+        # teste para avaliar se o limite superior é menor do que  o inferior.
+        for i in xrange(len(limite_superior)):
+            if limite_inferior[i] >= limite_superior[i]:
+                raise ValueError('O limite inferior deve ser menor do que o limite superior para todas as dimensões')
+
+        # teste para avaliar se o ponto focal tem mesmo tamanho do número de parâmetros
+        if kwargs.get('otimo') is not None:
+            if len(kwargs.get('otimo')) != len(limite_superior):
+                raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior')
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DO MÉTODO
@@ -846,10 +819,19 @@ class PSO:
         # tamanho do histórico
         nhistorico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
 
-        # TODO: excluir
-        self.k = kwargs.get('k') if kwargs.get('k') is not None else 1.0  # Utilizado no método CFM | Defaut 1, conforme recomendação de    [4] (Para o método CFM)
-        # TODO: excluir
-        self.gama = kwargs.get('gama') if kwargs.get('gama') is not None else 0.5  # Utilizado no método CFM | Default 0.5, conforme recomendação de [7] para funções com mínimos locais
+        # -------------------------------------------------------------------------------
+        # VALIDAÇÕES ADICIONAIS
+        # -------------------------------------------------------------------------------
+        if (self.itmax - 1) == 1 and \
+            (self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0] or
+            self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]):
+            raise ValueError('Para o método de inércia {}'.format(self.metodo._metodosdisponiveis['inercia'][0])+
+                             ' e método de aceleraçãode {}'.format(self.metodo._metodosdisponiveis['aceleracao'][0])+
+                             ', o número de iterações deve ser, no mínimo, 2')
+
+        if self.metodo.busca == self.metodo._metodosdisponiveis['busca'][1] and self.foco is None:
+                raise ValueError('Dado que o método de busca é {}'.format(self.metodo._metodosdisponiveis['busca'][1])+
+                                 ' necessário informar o valor de um ponto ótimo da função. keyword: otimo')
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DE ATRIBUTOS CUJOS VALORES DEFAULT DEPENDEM DO MÉTODO
@@ -896,44 +878,40 @@ class PSO:
         
         **Observe que NEM todas as combinações de métodos possuem valores *default* de parâmetros. Use com cautela**
         '''
-        # TODO: usar listas para salvar w, C1 e C2 (e não mais duas variáveis)
         # -------------------------------------------------------------------------------
         # PESO DE INÉRCIA
         # -------------------------------------------------------------------------------
         if w is None:
             if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0]: # TVIW-linear
-                self.wi = 0.9  # Conforme valor recomendado por [4]
-                self.wf = 0.4  # Conforme valor recomendado por [4]
+                self.w = [0.9,0.4]  # Conforme valor recomendado por [4]
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
-                self.wi = None  # Valor não será necessário. W é aleatório
+                self.w = [None]*2  # Valor não será necessário. W é aleatório
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][2]: # Constante
-                self.wi = 0.9 # Conforme valor recomendado por [4]
+                self.w = [0.9]*2 # Conforme valor recomendado por [4]
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: #TVIW-Adaptive-vel
-                self.wi = 0.9  # Conforme valor recomendado por [8]
-                self.wf = 0.3  # Conforme valor recomendado por [8]
+                self.w = [0.9,0.3]  # Conforme valor recomendado por [8]
             elif self.metodo.inercia is None:
-                self.wi = None
+                self.w = [None]*2
         else:
             if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0] or self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]:
                 if len(w) == 2:
-                    self.wi = w[0]
-                    self.wf = w[1]
+                    self.w = w
                 else:
                     raise ValueError('w deve ser uma lista de 2 valores, visto que o método para w é {}'.format(self.metodo.inercia))
 
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
                 if w is None:
-                    self.wi = None  # Valor não será necessário. W é aleatório
+                    self.w = [None]*2  # Valor não será necessário. W é aleatório
                 else:
                     raise ValueError('w deve ser None, pois varia aleatoriamente, visto que o método para w é {}'.format(self.metodo.inercia))
 
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][2]: # Constante
                 if len(w) == 1:
-                    self.wi = w[0]
+                    self.w = w*2
                 else:
                     raise ValueError('w deve ser uma lista de 1 valor, visto que o método para w é {}'.format(self.metodo.inercia))
             elif self.metodo.inercia is None:
-                self.wi = None
+                self.w = [None]*2
 
         # -------------------------------------------------------------------------------
         # COEFICIENTE DE ACELERAÇÃO DO TERMO COGNITIVO
@@ -942,22 +920,20 @@ class PSO:
             if (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][0]) or\
                     (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]):
                 if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
-                    self.C1i = 2.5  # Default 2.5, conforme recomendado por [10]
-                    self.C1f = 0.5  # Default 0.5, conforme recomendado por [10]
+                    self.C1 = [2.5,0.5]  # Default 2.5, conforme recomendado por [10]
                 elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: # inercia: TVIW-Adaptive-vel
-                    self.C1i = 1.49
+                    self.C1 = [1.49]*2
                 else:
-                    self.C1i = 2.0  # Default 2, conforme recomendado por [4]
+                    self.C1 = [2.0]*2  # Default 2, conforme recomendado por [4]
         else:
             if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
                 if len(C2) == 2:
-                    self.C1i = C1[0]
-                    self.C1f = C1[1]
+                    self.C1 = C1
                 else:
                     raise ValueError('C1 deve ser uma lista de 2 valores para usar o método {}'.format(self.metodo.aceleracao))
             else:
                 if len(C1) == 1:
-                    self.C1i = C1[0]
+                    self.C1 = C1*2
                 else:
                     raise ValueError('C1 deve ser uma lista de 1 valor para usar o método {}'.format(self.metodo.aceleracao))
 
@@ -968,22 +944,20 @@ class PSO:
             if (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][0]) or\
                     (self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]):
                 if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
-                    self.C2i = 0.5  # Default 0.5, conforme recomendado por [10]
-                    self.C2f = 2.5  # Default 2.5, conforme recomendado por [10]
+                    self.C2 = [0.5,2.5]  # Default 0.5, conforme recomendado por [10]
                 elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: # inercia: TVIW-Adaptive-vel
-                    self.C2i = 1.49
+                    self.C2 = [1.49]*2
                 else:
-                        self.C2i = 2.0  # Default 2, conforme recomendado por [4]
+                    self.C2 = [2.0]*2  # Default 2, conforme recomendado por [4]
         else:
             if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
                 if len(C2) == 2:
-                    self.C2i = C2[0]
-                    self.C2f = C2[1]
+                    self.C2 = C2
                 else:
                     raise ValueError('C2 deve ser uma lista de 2 valores para usar o método {}'.format(self.metodo.aceleracao))
             else:
                 if len(C2) == 1:
-                    self.C2i = C2[0]
+                    self.C2 = C2*2
                 else:
                     raise ValueError('C2 deve ser uma lista de 1 valor para usar o método {}'.format(self.metodo.aceleracao))
 
@@ -1040,18 +1014,18 @@ class PSO:
 
             if self.metodo.Vreinit == self.metodo._metodosdisponiveis['Vreinit'][1]: # Constante
                 if Vreinit is None:
-                    self.Vreinit_init = [self.Vmax, 1.0]  # Conforme [10], a velocidade de reinicialização é mantida em Vmax
+                    self.Vreinit = [self.Vmax, 1.0]  # Conforme [10], a velocidade de reinicialização é mantida em Vmax
                 else:
                     if Vreinit[1] == 1.0:
-                        self.Vreinit_init = Vreinit
+                        self.Vreinit = Vreinit
                     else:
                         raise ValueError('The porcentage must be 1 for Vreinit, because the method chosen is {}'.format(self.metodo.Vreinit))
 
             elif self.metodo.Vreinit == self.metodo._metodosdisponiveis['Vreinit'][0]:
                 if Vreinit is None:
-                    self.Vreinit_init = [self.Vmax, 0.1]  # Conforme [10], a velocidade de reinicialização inicial é Vmax e decresce linearmente até 10% deste valor
+                    self.Vreinit = [self.Vmax, 0.1]  # Conforme [10], a velocidade de reinicialização inicial é Vmax e decresce linearmente até 10% deste valor
                 else:
-                     self.Vreinit_init = Vreinit
+                     self.Vreinit = Vreinit
 
         else:
             self.Vreinit = None  # Não é utilizada pelos demais métodos
@@ -1090,18 +1064,16 @@ class PSO:
 
         * ``printit`` (bool: True ou False): se True o número das iterações, ao decorrer da busca, são apresentadas em tela.
         """
+        # Variáveis globais: compartilhadas com Particula
+        # Controle de threads
         global Controle_FO, Controle_Particula, Controle_Iteracao, Controle_variaveis, total_particulas_atendidas, Controle_Total_Threads
-        global vetor_posicoes, vetor_fitness, vetor_velocidades, best_fitness, gbest  # Apenas para o método de gbest Enxame
+        # variáveis compartilhadas
+        global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest, best_fitness, gbest  # Apenas para o método de gbest Enxame
 
-        # FO: função objetivo -> tem DE ser uma classe herdando os atributos da classe Thread, os resultados tem
-        # DE ser um número REAL, sendo disponibilizados em método result (FO.result).
-        # TODO: colocar esta validação em __init__
-        if (self.itmax - 1) == 1 and (self.metodo.inercia == 'TVIW-linear' or self.metodo.aceleracao == 'TVAC'):
-            raise ValueError, u'Para os métodos de peso de inércia e aceleraçao com variaçao linear (TVIW-linear e TVAC), o número de iterações deve ser, no mínimo, 2'
-
-        # Controles de Threads | Semáforo
+        # Controles de Threads | Semáforo: número máximo de threads que são executadas ao mesmo tempo
         max_Threads_permitido = 50
 
+        # num_Threads é mantido no número de partículas, caso não ultrapasse max_Threads_permitido
         if self.Num_particulas <= max_Threads_permitido:
             num_Threads = self.Num_particulas
 
@@ -1113,9 +1085,10 @@ class PSO:
 
         # Inicializações de listas: posiçoes, velocidades e fitness
 
-        vetor_posicoes = []
-        vetor_velocidades = []
-        vetor_fitness = []
+        vetor_posicoes = [] # vetor contendo o histórico das posicões de cada partícula em iterações
+        vetor_velocidades = [] # vetor contendo o histórico das velocidades de cada partícula em iterações
+        vetor_fitness = [] # vetor contendo o histórico do fitness de cada partícula em iterações
+        vetor_pbest =[] # vetor contendo o histórico das melhores posicões de cada partícula em iterações
 
         for i in xrange(self.itmax):
             #Posição
@@ -1152,19 +1125,10 @@ class PSO:
                 pos = []
                 vel = []
                 for p in xrange(self.Num_parametros):
-                    random.seed(ID_particle + p * 2 + 245)
-                    if (self.posinit_sup is None) and (self.posinit_inf is None):
-                        pos.append(random.uniform(self.limite_inferior[p], self.limite_superior[p]))
-                        vel.append(random.uniform(self.limite_inferior[p], self.limite_superior[p]))
-                    elif (self.posinit_sup is not None) and (self.posinit_inf is None):
-                        pos.append(random.uniform(self.limite_inferior[p], self.posinit_sup[p]))
-                        vel.append(random.uniform(self.limite_inferior[p], self.posinit_sup[p]))
-                    elif (self.posinit_sup is None) and (self.posinit_inf is not None):
-                        pos.append(random.uniform(self.posinit_inf[p], self.limite_superior[p]))
-                        vel.append(random.uniform(self.posinit_inf[p], self.limite_superior[p]))
-                    elif (self.posinit_sup is not None) and (self.posinit_inf is not None):
-                        pos.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
-                        vel.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
+                    random.seed(ID_particle + p * 2 + 245) # controle de sementes
+                    # as posições e velocidades são amostradas de uma uniforme
+                    pos.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
+                    vel.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
 
                 auxp = copy(pos)
                 auxv = copy(vel)
@@ -1178,13 +1142,8 @@ class PSO:
                 threadarray.append(fitness)
                 ID_particle += 1
 
-        # validação:  gbest foi definido para o método de busca Regiao
-        # TODO: colocar esta validação em __init__
         if self.metodo.busca == 'Regiao':
-            if self.foco is None:
-                raise ValueError, u'É necessário informar o valor de um ponto ótimo da função'
             vetor_posicoes[0][0] = self.foco
-
 
         # Inicializando melhores valores globais do enxame
         self.best_ID_particle = argmin(vetor_fitness[0])
@@ -1193,6 +1152,9 @@ class PSO:
             gbest = vetor_posicoes[0][self.best_ID_particle]
         elif self.metodo.busca == 'Regiao':
             gbest = self.foco
+
+        # Inicializando pbest
+        vetor_pbest = [vetor_posicoes[0],vetor_fitness[0]]
 
         # Inicialização dos vetores médios e de W, para plotagem de gráficos (def Gráficos):
         self.media_fitness = [0] * self.itmax
@@ -1206,7 +1168,7 @@ class PSO:
         self.desvio_fitness[0] = std(vetor_fitness[0], ddof=1)
         self.historico_best_fitness[0] = best_fitness
 
-        self.historico_w[0] = self.wi
+        self.historico_w[0] = self.w[0]
 
         aux1 = []
         for j in xrange(self.Num_particulas):
@@ -1235,41 +1197,42 @@ class PSO:
                 sys.stdout.write('ITERACAO: ' + str(it) + '\n')
                 sys.stdout.flush()
 
+            w = None; C1 = None; C2 = None; Vreinit = None
             # Atualização de w, C1, C2 e Vreinit
             if self.metodo.inercia == 'Constante':
-                self.w = self.wi
+                w = self.w[0]
             elif self.metodo.inercia == 'TVIW-linear':
-                self.w = self.wi + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.wi - self.wf)
+                w = self.w[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.w[0] - self.w[1])
             elif self.metodo.inercia == 'TVIW-random':
-                self.w = 0.5 + random.uniform(0.0, 1.0) / 2
+                w = 0.5 + random.uniform(0.0, 1.0) / 2
             elif self.metodo.inercia == 'TVIW-Adaptative-VI':
 
                 self.velocidade_ideal[it] = self.Vstart * (1 + cos(it * pi / self.Tend)) / 2
 
                 if self.media_velocidade[it - 1] >= self.velocidade_ideal[it]:
-                    self.w = max([self.historico_w[it - 1] - self.deltaw, self.wf])
+                    w = max([self.historico_w[it - 1] - self.deltaw, self.w[1]])
                 else:
-                    self.w = min([self.historico_w[it - 1] + self.deltaw, self.wi])
+                    w = min([self.historico_w[it - 1] + self.deltaw, self.w[0]])
             elif self.metodo.inercia is None:
-                self.w = None
+                w = None
 
             if self.metodo.aceleracao == 'Constante':
-                self.C1 = self.C1i
-                self.C2 = self.C2i
+                C1 = self.C1[0]
+                C2 = self.C2[0]
             elif self.metodo.aceleracao == 'TVAC':
-                self.C1 = self.C1i + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C1i - self.C1f)
-                self.C2 = self.C2i + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C2i - self.C2f)
+                C1 = self.C1[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C1[0] - self.C1[1])
+                C2 = self.C2[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C2[0] - self.C2[1])
 
             if self.metodo.algoritmo == 'HPSO':
-                self.Vreinit = []
+                Vreinit = []
                 for i in xrange(self.Num_parametros):
-                    self.Vreinit.append(self.Vreinit_init[0][i] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (
-                        self.Vreinit_init[0][i] - self.Vreinit_init[1] * self.Vreinit_init[0][i]))
+                    Vreinit.append(self.Vreinit[0][i] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (
+                        self.Vreinit[0][i] - self.Vreinit[1] * self.Vreinit[0][i]))
 
             # Create new Threads (Partículas)
             for ID_particle in vetor_Num_particulas:
                 Controle_Particula.acquire()  # Aquisião do Semáforo -> limitar a quantidade de particulas sendo executadas ao mesmo tempo
-                particula = Particula(FO, self.w, self.C1, self.C2, self.k, self.Vmax, self.Vreinit, it,
+                particula = Particula(FO, w, C1, C2, self.Vmax, Vreinit, it,
                                       self.Num_parametros, self.Num_particulas, self.metodo, self.limite_superior,
                                       self.limite_inferior, ID_particle, self.args_model)
                 particula.start()
@@ -1286,7 +1249,7 @@ class PSO:
             # Cálculo de parâmetros de avaliação, médias das iterações.
             self.media_fitness[it] = mean(vetor_fitness[it])
             self.desvio_fitness[it] = std(vetor_fitness[it], ddof=1)
-            self.historico_w[it] = self.w
+            self.historico_w[it] = w
             self.historico_best_fitness[it] = best_fitness
 
             aux1 = []
@@ -1378,20 +1341,8 @@ class PSO:
                                                                                        self.metodo.Vreinit) + '\n')
         outfile.write('--------------------------------' + '\n')
         outfile.write(u'Seleção dos parâmetros, partículas e iterações' + '\n')
-        outfile.write(u'INÍCIO - w: %s | c1: %s | c2: %s' % (self.wi, self.C1i, self.C2i) + '\n')
-        if self.metodo.inercia == 'Constante':
-            wf = self.wi
-        elif self.metodo.algoritmo != 'HPSO' and self.metodo.inercia != 'TVIW-random':
-            wf = self.wf
-        elif self.metodo.algoritmo == 'HPSO' or self.metodo.inercia == 'TVIW-random':
-            wf = None
-        if self.metodo.aceleracao == 'Constante':
-            C1f = self.C1i
-            C2f = self.C2i
-        else:
-            C1f = self.C1f
-            C2f = self.C2f
-        outfile.write(u'FIM    - w: %s | c1: %s | c2: %s' % (wf, C1f, C2f) + '\n')
+        outfile.write(u'INÍCIO - w: %s | c1: %s | c2: %s' % (self.w[0], self.C1[0], self.C2[0]) + '\n')
+        outfile.write(u'FIM    - w: %s | c1: %s | c2: %s' % (self.w[1], self.C1[1], self.C2[1]) + '\n')
         outfile.write(u'Vmax: %s' % self.Vmax + '\n')
         outfile.write(u'Vreinit: %s' % self.Vreinit + '\n')
         outfile.write(u'deltaw: %s' % self.deltaw + '\n')
