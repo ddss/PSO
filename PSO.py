@@ -26,6 +26,10 @@ Reinitialization velocity for HPSO:
 # -------------------------------------------------------------------------------
 # IMPORTAÇÃO DE PACOTES (packages import)
 # -------------------------------------------------------------------------------
+# Sistema
+import sys
+reload(sys)
+sys.setdefaultencoding("utf-8") # Forçar o sistema utilizar o coding utf-8
 
 # Importação de pacotes para cálculos
 import os
@@ -49,6 +53,7 @@ from matplotlib.pyplot import figure, axes, plot, subplot, xlabel, ylabel, \
 from mpl_toolkits.mplot3d import Axes3D, proj3d
 from matplotlib.patches import Ellipse, FancyArrowPatch
 
+from warnings import warn
 
 from auxiliares import Validacao_Diretorio, Arrow3D
 # -------------------------------------------------------------------------------
@@ -65,8 +70,8 @@ class Particula(Thread):
     qsi = 0
     pbest = 0
 
-    def __init__(self, FO, w, C1, C2, Vmax, Vreinit, it, num_parametros, num_particulas, metodo, limite_superior,
-                 limite_inferior, ID_particle, args_model=[]):
+    def __init__(self, FO, w, C1, C2, Vmax, Vreinit, num_parametros,  metodo, limite_superior,
+                 limite_inferior, ID_particle, num_particulas, args_model=[]):
 
         global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest
 
@@ -78,16 +83,16 @@ class Particula(Thread):
 
         # Atribuição de variáveis self
         self.metodo = metodo
-        self.__w = w
-        self.__C1 = C1
-        self.__C2 = C2
         self.Vmax = Vmax
         self.V_reinit = Vreinit
-        self.__it = it
-        self.__args_model = args_model
+        self.args_model = args_model
 
-        self.__num_particulas = num_particulas
+        self.w = w
+        self.C1 = C1
+        self.C2 = C2
+
         self.__num_parametros = num_parametros
+        self.__num_particulas = num_particulas
 
         self.ID_particle = ID_particle
 
@@ -97,21 +102,18 @@ class Particula(Thread):
 
         # Determinação da posição atual da partícula, velocidade inicial (PSO) e pbest 
 
-        self.posicao = copy(vetor_posicoes[self.__it - 1][self.ID_particle]) # Posição da partícula
-        self.Vo = copy(vetor_velocidades[self.__it - 1][self.ID_particle])   # Velocidade na iteração anterior
-        self.posicao = self.posicao.tolist()
-        # Correção de self.posicao e self.Vo
-        if isinstance(self.Vo[0].tolist(), list):
-            self.Vo = self.Vo[0].tolist()
-        if isinstance(self.posicao[0], list):
-            self.posicao = self.posicao[0].tolist()
+        self.posicao = copy(vetor_posicoes[self.ID_particle]).tolist() # Posição da partícula
+        self.Vo = copy(vetor_velocidades[self.ID_particle]).tolist()   # Velocidade na iteração anterior
 
         # Busca pela melhor posição desta partícula:
+        # pbest é uma lista de listas
+        # 0 - posição
+        # 1 - fitness em pbest
         self.pbest = vetor_pbest[0][self.ID_particle] # Posição para a qual a partícula obteve o melhor fitness
 
     def Fitness_Particula(self):
         # Cálculo do Fitness da partícula
-        Thfitness = self.FO(self.posicao, self.__args_model)
+        Thfitness = self.FO(self.posicao, self.args_model)
         Thfitness.start()
         Thfitness.join()
 
@@ -125,9 +127,9 @@ class Particula(Thread):
         R1 = random.uniform(0, 1, size(self.posicao))  # Termo de aceleração aleatório
         R2 = random.uniform(0, 1, size(self.posicao))  # Termo de aceleração aleatório
 
-        vel1 = [Vo * (self.__w) for Vo in self.Vo]
-        vel2 = [self.__C1 * R1[j] * (self.pbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
-        vel3 = [self.__C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
+        vel1 = [Vo * (self.w) for Vo in self.Vo]
+        vel2 = [self.C1 * R1[j] * (self.pbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
+        vel3 = [self.C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
         vel4 = [vel1[j] + vel2[j] + vel3[j] for j in xrange(self.__num_parametros)]
 
         if self.metodo.inercia != 'TVIW-Adaptative-VI':
@@ -169,8 +171,8 @@ class Particula(Thread):
         R1 = random.uniform(0, 1, size(self.posicao))  # Termo de aceleração aleatório
         R2 = random.uniform(0, 1, size(self.posicao))  # Termo de aceleração aleatório
 
-        vel1 = [self.__C1 * R1[j] * (self.pbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
-        vel2 = [self.__C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
+        vel1 = [self.C1 * R1[j] * (self.pbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
+        vel2 = [self.C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
         vel3 = [vel1[j] + vel2[j] for j in xrange(self.__num_parametros)]
 
         self.velocidade = [0] * self.__num_parametros
@@ -209,11 +211,14 @@ class Particula(Thread):
         Controle_variaveis.acquire()
 
         # Atualização dos vetores (históricos / Memória)
-        vetor_posicoes[self.__it][self.ID_particle] = self.posicao
-        vetor_velocidades[self.__it][self.ID_particle] = self.velocidade
-        vetor_fitness[self.__it][self.ID_particle] = self.fitness
+        vetor_posicoes[self.ID_particle] = self.posicao
+        vetor_velocidades[self.ID_particle] = self.velocidade
+        vetor_fitness[self.ID_particle] = self.fitness
 
         # atualizando pbest
+        # pbest é uma lista de listas
+        # 0 - posição
+        # 1 - fitness em pbest
         if self.fitness < vetor_pbest[1][self.ID_particle]:
             vetor_pbest[0][self.ID_particle] = self.posicao
 
@@ -658,6 +663,7 @@ class PSO:
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
         * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (limita a quantidade de informações que são salvas). Default: min(itmax,500)
         * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 1
+        * ``n_desempenho`` (float): número de amostragens a serem realizadas, para indicação do desempenho ao algoritmo.
 
         ==========
         Exemplo 3
@@ -812,13 +818,13 @@ class PSO:
         self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
         # Argumentos extras a serem enviados para o modelo:
         self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
-        # TODO: Implementar n_historico
         # TODO: Implementar itmin
         # Número mínimo de iterações, caso não definido será 1
         itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else 1
         # tamanho do histórico
-        nhistorico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
-
+        self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
+        # identificação do desempenho
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else max([20, int(itmax/self.n_historico)])
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
         # -------------------------------------------------------------------------------
@@ -832,6 +838,15 @@ class PSO:
         if self.metodo.busca == self.metodo._metodosdisponiveis['busca'][1] and self.foco is None:
                 raise ValueError('Dado que o método de busca é {}'.format(self.metodo._metodosdisponiveis['busca'][1])+
                                  ' necessário informar o valor de um ponto ótimo da função. keyword: otimo')
+
+        if self.n_historico >= 2000:
+            warn('Grandes históricos (n_historicos) podem levar a um alto consumo de memória e reduzir o desempenho')
+
+        if self.n_desempenho > itmax:
+            raise ValueError('O n_desempenho deve ser, no máximo, o número de iterações'.format(itmax))
+
+        if self.n_desempenho > 100:
+            warn('Muitas amostragens (n_desempenho) pode levar a um alto consumo de memória e reduzir o desempenho')
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DE ATRIBUTOS CUJOS VALORES DEFAULT DEPENDEM DO MÉTODO
@@ -1084,22 +1099,10 @@ class PSO:
         Controle_FO = BoundedSemaphore(value=num_Threads)  # Semáforo -> Controlar o número máximo de Threads a serem utilizadas pelo Programa (evitar número excessivo) ao mesmo tempo para avaliação da função objetivo no def __init__
 
         # Inicializações de listas: posiçoes, velocidades e fitness
-
-        vetor_posicoes = [] # vetor contendo o histórico das posicões de cada partícula em iterações
-        vetor_velocidades = [] # vetor contendo o histórico das velocidades de cada partícula em iterações
-        vetor_fitness = [] # vetor contendo o histórico do fitness de cada partícula em iterações
-        vetor_pbest =[] # vetor contendo o histórico das melhores posicões de cada partícula em iterações
-
-        for i in xrange(self.itmax):
-            #Posição
-            aux1 = [0] * self.Num_particulas
-            vetor_posicoes.append(aux1)
-            # Velocidade
-            aux2 = [0] * self.Num_particulas
-            vetor_velocidades.append(aux2)
-            #Fitness
-            aux3 = [1e100] * self.Num_particulas
-            vetor_fitness.append(aux3)
+        # Estes vetores irão salvar o estado atual das partículas
+        vetor_posicoes = [0]*self.Num_particulas # vetor contendo o histórico das posicões de cada partícula em iterações
+        vetor_velocidades = [0]*self.Num_particulas # vetor contendo o histórico das velocidades de cada partícula em iterações
+        vetor_fitness = [0]*self.Num_particulas # vetor contendo o histórico do fitness de cada partícula em iterações
 
         #Inicialização das posicoes, velocidades e fitness
 
@@ -1113,9 +1116,9 @@ class PSO:
             if ID_particle > 0:
                 if not (threadarray[ID_FO].isAlive()):
                     if size(threadarray[ID_FO].result) > 1:
-                        raise NameError, u'A função objetivo possui mais de uma dimensão. Verificá-la'
+                        raise ValueError('A função objetivo possui mais de uma dimensão. Verificá-la')
                     else:
-                        vetor_fitness[0][ID_FO] = float(copy(threadarray[ID_FO].result))
+                        vetor_fitness[ID_FO] = float(copy(threadarray[ID_FO].result))
                         ID_FO += 1
                         Controle_FO.release()
 
@@ -1132,47 +1135,54 @@ class PSO:
 
                 auxp = copy(pos)
                 auxv = copy(vel)
-                vetor_posicoes[0][ID_particle] = auxp.tolist()
-                vetor_velocidades[0][ID_particle] = auxv.tolist()
+                vetor_posicoes[ID_particle] = auxp.tolist()
+                vetor_velocidades[ID_particle] = auxv.tolist()
 
                 # Fitness
                 Controle_FO.acquire()
-                fitness = FO(vetor_posicoes[0][ID_particle], self.args_model)
+                fitness = FO(vetor_posicoes[ID_particle], self.args_model)
                 fitness.start()
                 threadarray.append(fitness)
                 ID_particle += 1
 
         if self.metodo.busca == 'Regiao':
-            vetor_posicoes[0][0] = self.foco
+            vetor_posicoes[0] = self.foco # Adiciono forçadamente o ponto focal para a primeira partícula
+        # Inicializando os melhores valores das partículas (pbest)
+        vetor_pbest = [vetor_posicoes,vetor_fitness]
 
         # Inicializando melhores valores globais do enxame
-        self.best_ID_particle = argmin(vetor_fitness[0])
-        best_fitness = vetor_fitness[0][self.best_ID_particle]
+        best_ID_particle = argmin(vetor_fitness) # partícula com menor valor de função objetivo
+        best_fitness = vetor_fitness[best_ID_particle] # valor da função objetivo no ponto ótimo
         if self.metodo.busca == 'Otimo':
-            gbest = vetor_posicoes[0][self.best_ID_particle]
+            gbest = vetor_posicoes[best_ID_particle]
         elif self.metodo.busca == 'Regiao':
             gbest = self.foco
 
-        # Inicializando pbest
-        vetor_pbest = [vetor_posicoes[0],vetor_fitness[0]]
-
         # Inicialização dos vetores médios e de W, para plotagem de gráficos (def Gráficos):
-        self.media_fitness = [0] * self.itmax
-        self.media_velocidade = [0] * self.itmax
-        self.velocidade_ideal = [0] * self.itmax
-        self.desvio_fitness = [0] * self.itmax
-        self.historico_w = [0] * self.itmax
-        self.historico_best_fitness = [0] * self.itmax
+        # vetores baseados no histórico comprimido
+        self.media_fitness = [0] * self.n_desempenho
+        self.media_velocidade = [0] * self.n_desempenho
+        self.velocidade_ideal = [0] * self.n_desempenho
+        self.desvio_fitness = [0] * self.n_desempenho
+        self.historico_w = [0] * self.n_desempenho
+        self.historico_best_fitness = [0] * self.n_desempenho
 
-        self.media_fitness[0] = mean(vetor_fitness[0])
-        self.desvio_fitness[0] = std(vetor_fitness[0], ddof=1)
+        # vetores baseados nos últimos valores salvos
+        self.historico_fitness = [0]* self.n_historico
+        self.historico_posicoes = [0]* self.n_historico
+        self.historico_fitness[0] = copy(vetor_fitness).tolist()
+        self.historico_posicoes[0] = copy(vetor_posicoes).tolist()
+
+        # salvando primeiro valores
+        self.media_fitness[0] = mean(vetor_fitness)
+        self.desvio_fitness[0] = std(vetor_fitness, ddof=1)
         self.historico_best_fitness[0] = best_fitness
 
         self.historico_w[0] = self.w[0]
 
         aux1 = []
         for j in xrange(self.Num_particulas):
-            aux2 = [abs(vetor_velocidades[0][j][k]) for k in xrange(self.Num_parametros)]
+            aux2 = [abs(vetor_velocidades[j][k]) for k in xrange(self.Num_parametros)]
             aux1.append(aux2)
 
         self.media_velocidade[0] = mean(aux1)
@@ -1187,6 +1197,11 @@ class PSO:
         vetor_Num_particulas = range(self.Num_particulas)  # Vetor_ID_PARTICULA
 
         # Iterações
+        ithist = 0 # contador do histórico
+        self.index_desempenho = [(int((self.itmax-1)/self.n_desempenho))*k for k in xrange(1,self.n_desempenho+1)]
+        itdesempenho = 0
+        velocidade_ideal = 0
+        w = self.w[0]; C1 = None; C2 = None; Vreinit = None
         for it in xrange(1, self.itmax):  # a iteração 0 é a inicialização
 
             total_particulas_atendidas = 0  # Contagem de partículas que finalizaram a execução
@@ -1197,7 +1212,13 @@ class PSO:
                 sys.stdout.write('ITERACAO: ' + str(it) + '\n')
                 sys.stdout.flush()
 
-            w = None; C1 = None; C2 = None; Vreinit = None
+            # Calculando média das velocidades:
+            vel_aux = []
+            for j in xrange(self.Num_particulas):
+                vel_aux.append([abs(vetor_velocidades[j][k]) for k in xrange(self.Num_parametros)])
+
+            media_velocidade = mean(vel_aux)
+
             # Atualização de w, C1, C2 e Vreinit
             if self.metodo.inercia == 'Constante':
                 w = self.w[0]
@@ -1207,12 +1228,13 @@ class PSO:
                 w = 0.5 + random.uniform(0.0, 1.0) / 2
             elif self.metodo.inercia == 'TVIW-Adaptative-VI':
 
-                self.velocidade_ideal[it] = self.Vstart * (1 + cos(it * pi / self.Tend)) / 2
+                velocidade_ideal = self.Vstart * (1 + cos(it * pi / self.Tend)) / 2
 
-                if self.media_velocidade[it - 1] >= self.velocidade_ideal[it]:
-                    w = max([self.historico_w[it - 1] - self.deltaw, self.w[1]])
+                if media_velocidade >= velocidade_ideal:
+                    w = max([w - self.deltaw, self.w[1]])
                 else:
-                    w = min([self.historico_w[it - 1] + self.deltaw, self.w[0]])
+                    w = min([w + self.deltaw, self.w[0]])
+
             elif self.metodo.inercia is None:
                 w = None
 
@@ -1232,48 +1254,58 @@ class PSO:
             # Create new Threads (Partículas)
             for ID_particle in vetor_Num_particulas:
                 Controle_Particula.acquire()  # Aquisião do Semáforo -> limitar a quantidade de particulas sendo executadas ao mesmo tempo
-                particula = Particula(FO, w, C1, C2, self.Vmax, Vreinit, it,
-                                      self.Num_parametros, self.Num_particulas, self.metodo, self.limite_superior,
-                                      self.limite_inferior, ID_particle, self.args_model)
+                particula = Particula(FO, w, C1, C2, self.Vmax, Vreinit,
+                                      self.Num_parametros, self.metodo, self.limite_superior,
+                                      self.limite_inferior, ID_particle, self.Num_particulas, self.args_model)
                 particula.start()
 
             # A execução aguarda a liberação (release) de Controle_Iteração
             Controle_Iteracao.acquire()
 
             if self.metodo.gbest == 'Enxame':
-                if min(vetor_fitness[it]) < best_fitness:
-                    best_loc_part = argmin(vetor_fitness[it])
-                    best_fitness = vetor_fitness[it][best_loc_part]
-                    gbest = vetor_posicoes[it][best_loc_part]
+                if min(vetor_fitness) < best_fitness:
+                    best_ID_particle = argmin(vetor_fitness)
+                    best_fitness = vetor_fitness[best_ID_particle]
+                    gbest = vetor_posicoes[best_ID_particle]
 
-            # Cálculo de parâmetros de avaliação, médias das iterações.
-            self.media_fitness[it] = mean(vetor_fitness[it])
-            self.desvio_fitness[it] = std(vetor_fitness[it], ddof=1)
-            self.historico_w[it] = w
-            self.historico_best_fitness[it] = best_fitness
+            if ithist > self.n_historico-1: # reinicio o contator do histórico
+                ithist = 0
+            # Armazenamento das informações em variáveis da classe (disponíveis para o Programa Principal)
+            self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
+            self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
 
-            aux1 = []
-            for j in xrange(self.Num_particulas):
-                aux2 = [abs(vetor_velocidades[it][j][k]) for k in xrange(self.Num_parametros)]
-                aux1.append(aux2)
+            ithist+=1
 
-            self.media_velocidade[it] = mean(aux1)
+            if self.index_desempenho[itdesempenho] == it:
+                # Cálculo de parâmetros de avaliação, médias das iterações.
+
+                self.media_fitness[itdesempenho] = mean(self.historico_fitness[ithist-1])
+                self.desvio_fitness[itdesempenho] = std(self.historico_fitness[ithist-1], ddof=1)/max([best_fitness, 1e-17])
+                self.historico_w[itdesempenho] = w
+                self.historico_best_fitness[itdesempenho] = best_fitness
+                self.velocidade_ideal[itdesempenho] = velocidade_ideal
+
+                aux1 = []
+                for j in xrange(self.Num_particulas):
+                    aux2 = [abs(vetor_velocidades[j][k]) for k in xrange(self.Num_parametros)]
+                    aux1.append(aux2)
+
+                self.media_velocidade[itdesempenho] = mean(aux1)
+
+                itdesempenho+=1
 
             # Liberação da proxima iteração
             Controle_Iteracao.release()
 
-        # Armazenamento das informações em variáveis da classe (disponíveis para o Programa Principal)
-        self.historico_fitness = vetor_fitness
-        self.historico_posicoes = vetor_posicoes
         self.gbest = gbest
         self.best_fitness = best_fitness
 
-        for it in xrange(self.itmax):
+        for ithist in xrange(self.n_historico):
             for ID_particula in xrange(self.Num_particulas):
-                if isnan(self.historico_fitness[it][ID_particula]):
+                if isnan(self.historico_fitness[ithist][ID_particula]):
                     raise NameError, u'Existe NaN como valor de função objetivo. Verificar.'
 
-    def Result_txt(self, base_path=None):
+    def Relatorios(self, base_path=None):
         '''
         Método para gerar os arquivos de texto contendo os resultados
         
@@ -1351,8 +1383,8 @@ class PSO:
         outfile.write('--------------------------------' + '\n')
         outfile.write(u'RESULTADOS' + '\n')
         outfile.write(u'ótimo: %s | fitness: %s \n' % (self.gbest, self.best_fitness))
-        outfile.write(u'Desvio relativo: %s\n'%(self.desvio_fitness[self.itmax-1]/max([1e-16,self.best_fitness])))
-        outfile.write(u'Desvio: %s\n'%(self.desvio_fitness[self.itmax-1]))
+        outfile.write(u'Desvio relativo: %s\n'%(self.desvio_fitness[self.n_desempenho-1]/max([1e-16,self.best_fitness])))
+        outfile.write(u'Desvio: %s\n'%(self.desvio_fitness[self.n_desempenho-1]))
         outfile.write(u'Fitness: %s\n'%(self.best_fitness))
         outfile.close()
 
@@ -1452,8 +1484,6 @@ class PSO:
         Validacao_Diretorio(base_path)
 
         # Gráficos de Desempenho do algoritmo de PSO-----------------------------------------------
-        # Início
-        iteracoes = range(self.itmax)
 
         # Uso do formato científico nos gráficos:
         formatter = ticker.ScalarFormatter(useMathText=True)
@@ -1462,8 +1492,8 @@ class PSO:
         # Desenvolvimento das iterações - Fitness e desvio do fitness
         fig = figure()
         ax = fig.add_subplot(2, 1, 1)
-        plot(iteracoes[0:self.itmax], self.media_fitness[0:self.itmax], 'b-', label=u'Média')
-        plot(iteracoes[0:self.itmax], self.historico_best_fitness[0:self.itmax], 'r-', label=u'Best Fitness')
+        plot(self.index_desempenho, self.media_fitness, 'b-', label=u'Média')
+        plot(self.index_desempenho, self.historico_best_fitness, 'r-', label=u'Best Fitness')
         ax.yaxis.grid(color='gray', linestyle='dashed')
         ax.xaxis.grid(color='gray', linestyle='dashed')
         xlim((0, self.itmax))
@@ -1471,110 +1501,43 @@ class PSO:
         legend(loc=legenda_posicao)
 
         ax2 = fig.add_subplot(2, 1, 2)
-        plot(iteracoes[0:self.itmax], self.desvio_fitness[0:self.itmax], 'b-', label=u'Desvio-padrão')
+        plot(self.index_desempenho, self.desvio_fitness, 'b-', label=u'Desvio-padrão')
         ax2.yaxis.grid(color='gray', linestyle='dashed')
         ax2.xaxis.grid(color='gray', linestyle='dashed')
         xlim((0, self.itmax))
         xlabel(u"Iterações", fontsize=15)
-        ylabel(u"Desvio-padrão de " + r"$\Phi$", fontsize=15)
+        ylabel(u"Desvio-padrão relativo de " + r"$\Phi$", fontsize=15)
         legend(loc=legenda_posicao)
         ax.yaxis.set_major_formatter(formatter)
         ax2.yaxis.set_major_formatter(formatter)
         fig.savefig(base_path + 'Medias_Fitness_global.png')
         close()
 
-        # Desenvolvimento das 50% primeiras iterações
-        fig = figure()
-        ax = fig.add_subplot(2, 1, 1)
-        plot(iteracoes[0:self.itmax / 2], self.media_fitness[0:self.itmax / 2], 'b-', label=u'Média')
-        plot(iteracoes[0:self.itmax / 2], self.historico_best_fitness[0:self.itmax / 2], 'r-', label=u'Best Fitness')
-        ax.yaxis.grid(color='gray', linestyle='dashed')
-        ax.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.itmax / 2))
-        legend(loc=legenda_posicao)
-        ylabel(u"Média de " + "$\Phi$")
-        #
-        ax2 = fig.add_subplot(2, 1, 2)
-        plot(iteracoes[0:self.itmax / 2], self.desvio_fitness[0:self.itmax / 2], 'b-', label=u'Desvio-padrão')
-        ax2.yaxis.grid(color='gray', linestyle='dashed')
-        ax2.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.itmax / 2))
-        xlabel(u"Iterações")
-        ylabel(u"Desvio-padrão de " + r"$\Phi$")
-        legend(loc=legenda_posicao)
-        ax.yaxis.set_major_formatter(formatter)
-        ax2.yaxis.set_major_formatter(formatter)
-        fig.savefig(base_path + 'Medias_Fitness_iteracoes_iniciais.png')
-        close()
-
-        # Desenvolvimento das 50% últimas iterações
-        fig = figure()
-        ax = fig.add_subplot(2, 1, 1)
-        plot(iteracoes[self.itmax / 2:self.itmax], self.media_fitness[self.itmax / 2:self.itmax], 'b-', label=u'Média')
-        plot(iteracoes[self.itmax / 2:self.itmax], self.historico_best_fitness[self.itmax / 2:self.itmax], 'r-',
-             label=u'Best Fitness')
-        ax.yaxis.grid(color='gray', linestyle='dashed')
-        ax.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((self.itmax / 2, self.itmax))
-        legend(loc=legenda_posicao)
-        ylabel(u"Média de" + r"$\Phi$")
-        #
-        ax2 = fig.add_subplot(2, 1, 2)
-        plot(iteracoes[self.itmax / 2:self.itmax], self.desvio_fitness[self.itmax / 2:self.itmax], 'b-',
-             label=u'Desvio-padrão')
-        ax2.yaxis.grid(color='gray', linestyle='dashed')
-        ax2.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((self.itmax / 2, self.itmax))
-        xlabel(u"Iterações")
-        ylabel(u"Desvio-padrão de " + r"$\Phi$")
-        legend(loc=legenda_posicao)
-        ax.yaxis.set_major_formatter(formatter)
-        ax2.yaxis.set_major_formatter(formatter)
-        fig.savefig(base_path + 'Medias_Fitness_iteracoes_finais.png')
-        close()
-
         # Desenvolvimento das Iterações - Velocidades
         fig = figure()
         ax = fig.add_subplot(1, 1, 1)
-        plot(iteracoes[0:self.itmax], self.media_velocidade[0:self.itmax], 'b-')
+        plot(self.index_desempenho, self.media_velocidade, 'b-')
         if self.metodo.inercia == 'TVIW-Adaptative-VI':
-            plot(iteracoes[0:self.itmax], self.velocidade_ideal[0:self.itmax], 'r-')
+            plot(self.index_desempenho, self.velocidade_ideal, 'r-')
         ax.yaxis.grid(color='gray', linestyle='dashed')
         ax.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.itmax))
+        xlim((0, self.n_historico))
         xlabel(u"Iterações", fontsize=15)
         ylabel(u"Média de " + r"$\nu$", fontsize=15)
         ax.yaxis.set_major_formatter(formatter)
         fig.savefig(base_path + 'Medias_velocidade_global.png')
         close()
 
-        # Desenvolvimento das Iterações (Evolução do algoritmo)
-        fig = figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        for i in xrange(self.itmax):
-            xs = [i] * self.Num_particulas
-            ys = range(0, self.Num_particulas)
-            zs = self.historico_fitness[i]
-            ax.scatter(xs, ys, zs, c='b', marker='o')
-
-        ax.set_xlabel(u'Iteração', fontsize=15)
-        ax.set_ylabel(u'ID_Partícula', fontsize=15)
-        ax.set_zlabel(r'$\Phi$', fontsize=15)
-        ax.w_zaxis.set_major_formatter(formatter)
-        fig.savefig(base_path + 'Evolucao_algoritmo.png')
-        close()
-
         if (self.metodo.inercia == 'TVIW-linear') or (self.metodo.inercia == 'TVIW-random') or (self.metodo.inercia == 'TVIW-Adaptative-VI'):
             # Gráfico de histório do inertia weight
             fig = figure()
             ax3 = fig.add_subplot(1, 1, 1)
-            plot(iteracoes, self.historico_w, 'b-')
+            plot(self.index_desempenho, self.historico_w, 'b-')
             ax3.yaxis.grid(color='gray', linestyle='dashed')
             ax3.xaxis.grid(color='gray', linestyle='dashed')
             xlim((0, self.itmax))
             if self.metodo.inercia == 'TVIW-linear':
-                ylim((self.wf, self.wi))
+                ylim((self.w[1], self.w[0]))
             xlabel(u"Iterações")
             ylabel(u"w")
             ax3.yaxis.set_major_formatter(formatter)
@@ -1584,14 +1547,14 @@ class PSO:
         # Transformação do histórico das posições e do fitness
         hist_posicoes = []
         hist_fitness = []
-        for it in xrange(self.itmax):
+        for it in xrange(self.n_historico):
             for ID_particula in xrange(self.Num_particulas):
                 hist_posicoes.append(self.historico_posicoes[it][ID_particula])
                 hist_fitness.append(self.historico_fitness[it][ID_particula])
 
         # Histograma das posições
         for D in xrange(self.Num_parametros):
-            aux = [hist_posicoes[it][D] for it in xrange(self.itmax + 1)]  # obtenção das posições para a dimensão D
+            aux = [hist_posicoes[it][D] for it in xrange(self.n_historico)]  # obtenção das posições para a dimensão D
 
             fig = figure()
             ax = fig.add_subplot(1, 1, 1)
