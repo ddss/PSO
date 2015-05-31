@@ -663,7 +663,7 @@ class PSO:
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
         * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (limita a quantidade de informações que são salvas). Default: min(itmax,500)
         * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 1
-        * ``n_desempenho`` (float): número de amostragens a serem realizadas, para indicação do desempenho ao algoritmo.
+        * ``n_desempenho`` (float): número de amostragens a serem realizadas, para indicação do desempenho ao algoritmo. Default: 20
 
         ==========
         Exemplo 3
@@ -824,7 +824,7 @@ class PSO:
         # tamanho do histórico
         self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
         # identificação do desempenho
-        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else max([20, int(itmax/self.n_historico)])
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else 20
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
         # -------------------------------------------------------------------------------
@@ -841,6 +841,9 @@ class PSO:
 
         if self.n_historico >= 2000:
             warn('Grandes históricos (n_historicos) podem levar a um alto consumo de memória e reduzir o desempenho')
+
+        if self.n_historico > itmax:
+            raise ValueError('O histórico não pode ser maior do que o número máximo de iterações')
 
         if self.n_desempenho > itmax:
             raise ValueError('O n_desempenho deve ser, no máximo, o número de iterações'.format(itmax))
@@ -861,6 +864,21 @@ class PSO:
         # inicialização dos valores default de w, C1 e C2 e criação dos atributos
         self.__defaultCoeficientes(w, C1, C2)
         self.__defaultVelocidades(Vmax, Vreinit)
+
+        # -------------------------------------------------------------------------------
+        # INICIALIZAÇÃO DAS LISTAS DE HISTÓRICO
+        # -------------------------------------------------------------------------------
+        # vetores baseados nas amostragens do desempenho
+        self.media_fitness = [0] * self.n_desempenho
+        self.media_velocidade = [0] * self.n_desempenho
+        self.velocidade_ideal = [0] * self.n_desempenho
+        self.desvio_fitness = [0] * self.n_desempenho
+        self.historico_w = [0] * self.n_desempenho
+        self.historico_best_fitness = [0] * self.n_desempenho
+
+        # vetores baseados nos n_historico - salvam os n_historico últimos valores
+        self.historico_fitness = [0]* self.n_historico
+        self.historico_posicoes = [0]* self.n_historico
 
     def __defaultCoeficientes(self, w, C1, C2):
         '''
@@ -1079,13 +1097,19 @@ class PSO:
 
         * ``printit`` (bool: True ou False): se True o número das iterações, ao decorrer da busca, são apresentadas em tela.
         """
-        # Variáveis globais: compartilhadas com Particula
-        # Controle de threads
+        # ------------------------------------------------------------------------------
+        # VARIÁVEIS GLOBAIS - Compartilhada com Partícula
+        # ------------------------------------------------------------------------------
+        #  Controle de threads
         global Controle_FO, Controle_Particula, Controle_Iteracao, Controle_variaveis, total_particulas_atendidas, Controle_Total_Threads
         # variáveis compartilhadas
-        global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest, best_fitness, gbest  # Apenas para o método de gbest Enxame
+        global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest, best_fitness, gbest
 
+        # ------------------------------------------------------------------------------
+        # CONTROLE DE THREADS - PARTÍCULAS
+        # ------------------------------------------------------------------------------
         # Controles de Threads | Semáforo: número máximo de threads que são executadas ao mesmo tempo
+        # limita o número de partículas sendo executadas ao mesmo tempo
         max_Threads_permitido = 50
 
         # num_Threads é mantido no número de partículas, caso não ultrapasse max_Threads_permitido
@@ -1098,33 +1122,47 @@ class PSO:
         Controle_Particula = BoundedSemaphore(value=num_Threads)  # Semáforo -> Controlar o número máximo de Threads a serem utilizadas pelo Programa (evitar número excessivo) ao mesmo tempo para avaliação das partículas no def Busca
         Controle_FO = BoundedSemaphore(value=num_Threads)  # Semáforo -> Controlar o número máximo de Threads a serem utilizadas pelo Programa (evitar número excessivo) ao mesmo tempo para avaliação da função objetivo no def __init__
 
+        # Definição de Locks (para controle das interações e regiões críticas)
+        Controle_Iteracao = Lock()       # Aplicável para evitar que a iteração acabe prematuramente, devido ao não término da execução de Threads
+        Controle_variaveis = Lock()      # Aplicável para controlar a região crítica envolvendo as variáveis característica das partículas (posicão, velocidade, fitness e gbest)
+        Controle_Total_Threads = Lock()  # Aplicável para controlar a região crítica envolvendo a variável total_particulas_atendidas
+
+        # ------------------------------------------------------------------------------
+        # INICIALIAÇÃO DE VARIÁVEIS PARA SALVAR AS INFORMAÇÕES DAS PARTÍCULAS
+        # ------------------------------------------------------------------------------
         # Inicializações de listas: posiçoes, velocidades e fitness
-        # Estes vetores irão salvar o estado atual das partículas
+        # Estes vetores irão salvar o estado atual das partículas e são globais
         vetor_posicoes = [0]*self.Num_particulas # vetor contendo o histórico das posicões de cada partícula em iterações
         vetor_velocidades = [0]*self.Num_particulas # vetor contendo o histórico das velocidades de cada partícula em iterações
         vetor_fitness = [0]*self.Num_particulas # vetor contendo o histórico do fitness de cada partícula em iterações
 
-        #Inicialização das posicoes, velocidades e fitness
-
-        threadarray = []
-        ID_FO = 0
-        ID_particle = 0
+        # ----------------------------------------------------------------------------------------
+        # INICIALIAÇÃO DO ALGORITMO: vetor_posicoes, vetor_velocidades, vetor_fitness, vetor_pbest
+        # -----------------------------------------------------------------------------------------
+        threadarray = [] # lista que conterá as threads (fitness)
+        ID_FO = 0 # índice para vetores de informações (posicao, fitness) no loop da para armazenamento do valor da
+                  #  função objetivo - tem o mesmo significado de ID_particle
+        ID_particle = 0 # índice para vetores de informações (posicao, fitness, velocidade) no loop para iniciar a
+                        # função objetivo
 
         while (ID_particle < self.Num_particulas) or (ID_FO < self.Num_particulas):
 
-            # Fitness
-            if ID_particle > 0:
-                if not (threadarray[ID_FO].isAlive()):
-                    if size(threadarray[ID_FO].result) > 1:
+            # Loop: armazenando o valor da função objetivo calculado pela partícula
+            # no vetor_fitness.
+            if ID_particle > 0: # apenas quando houverem "partículas" inicializadas. Neste ponto, as partículas são as
+                                # threads da função objetivo
+                if not (threadarray[ID_FO].isAlive()): # teste para validar de a thread está ativa
+                    if size(threadarray[ID_FO].result) > 1: # validação da função objetivo
                         raise ValueError('A função objetivo possui mais de uma dimensão. Verificá-la')
-                    else:
+                    else: # se passa no teste, é salva no vetor_fitness
                         vetor_fitness[ID_FO] = float(copy(threadarray[ID_FO].result))
-                        ID_FO += 1
-                        Controle_FO.release()
+                        ID_FO += 1 # incremento
+                        Controle_FO.release() # liberando a posição no semáforo
 
+            # Loop: inicialização da função objetivo
             if ID_particle < self.Num_particulas:
 
-                # Posição e velocidade
+                # Inicialização da posição e velocidade
                 pos = []
                 vel = []
                 for p in xrange(self.Num_parametros):
@@ -1132,52 +1170,42 @@ class PSO:
                     # as posições e velocidades são amostradas de uma uniforme
                     pos.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
                     vel.append(random.uniform(self.posinit_inf[p], self.posinit_sup[p]))
+                # Armazenamento dos valores iniciados de posicoes e velocidades
+                vetor_posicoes[ID_particle] = copy(pos).tolist()
+                vetor_velocidades[ID_particle] = copy(vel).tolist()
 
-                auxp = copy(pos)
-                auxv = copy(vel)
-                vetor_posicoes[ID_particle] = auxp.tolist()
-                vetor_velocidades[ID_particle] = auxv.tolist()
-
-                # Fitness
-                Controle_FO.acquire()
+                # Avaliação da função objetivo para para posição - fitness da partícula
+                Controle_FO.acquire() # Adiquirindo uma posição do semáforo. Caso não hajam posições disponíveis para
+                                      # o algoritmo espera o Controle_FO.release
                 fitness = FO(vetor_posicoes[ID_particle], self.args_model)
                 fitness.start()
                 threadarray.append(fitness)
                 ID_particle += 1
 
+        # Caso o método de busca seja Regiao, o ponto focal é forçadamente adicionado ao vetor_posicoes
         if self.metodo.busca == 'Regiao':
-            vetor_posicoes[0] = self.foco # Adiciono forçadamente o ponto focal para a primeira partícula
-        # Inicializando os melhores valores das partículas (pbest)
+            vetor_posicoes[0] = self.foco
+
+        # Inicializando os melhores valores das partículas (vetor_pbest) - variável global
+        # neste ponto, pbest é o próprio vetor_posicoes e vetor_fitness
         vetor_pbest = [vetor_posicoes,vetor_fitness]
 
-        # Inicializando melhores valores globais do enxame
+        # Inicializando melhores valores globais do enxame (gbest)
         best_ID_particle = argmin(vetor_fitness) # partícula com menor valor de função objetivo
-        best_fitness = vetor_fitness[best_ID_particle] # valor da função objetivo no ponto ótimo
+        best_fitness = vetor_fitness[best_ID_particle] # valor da função objetivo no ponto ótimo - variável global
         if self.metodo.busca == 'Otimo':
-            gbest = vetor_posicoes[best_ID_particle]
+            gbest = vetor_posicoes[best_ID_particle] # variável global
         elif self.metodo.busca == 'Regiao':
             gbest = self.foco
 
-        # Inicialização dos vetores médios e de W, para plotagem de gráficos (def Gráficos):
-        # vetores baseados no histórico comprimido
-        self.media_fitness = [0] * self.n_desempenho
-        self.media_velocidade = [0] * self.n_desempenho
-        self.velocidade_ideal = [0] * self.n_desempenho
-        self.desvio_fitness = [0] * self.n_desempenho
-        self.historico_w = [0] * self.n_desempenho
-        self.historico_best_fitness = [0] * self.n_desempenho
-
-        # vetores baseados nos últimos valores salvos
-        self.historico_fitness = [0]* self.n_historico
-        self.historico_posicoes = [0]* self.n_historico
+        # ----------------------------------------------------------------------------------------
+        # ARMAZENAMENTO NO HISTÓRICO
+        # ----------------------------------------------------------------------------------------
         self.historico_fitness[0] = copy(vetor_fitness).tolist()
         self.historico_posicoes[0] = copy(vetor_posicoes).tolist()
-
-        # salvando primeiro valores
         self.media_fitness[0] = mean(vetor_fitness)
-        self.desvio_fitness[0] = std(vetor_fitness, ddof=1)
+        self.desvio_fitness[0] = std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17])
         self.historico_best_fitness[0] = best_fitness
-
         self.historico_w[0] = self.w[0]
 
         aux1 = []
@@ -1188,26 +1216,36 @@ class PSO:
         self.media_velocidade[0] = mean(aux1)
         self.velocidade_ideal[0] = self.Vstart
 
-        # Definição de Locks (para controle das interações e regiões críticas)
-        Controle_Iteracao = Lock()       # Aplicável para evitar que a iteração acabe prematuramente, devido ao não término da execução de Threads
-        Controle_variaveis = Lock()      # Aplicável para controlar a região crítica envolvendo as variáveis característica das partículas (posicão, velocidade, fitness e gbest)
-        Controle_Total_Threads = Lock()  # Aplicável para controlar a região crítica envolvendo a variável total_particulas_atendidas
-
-        # Partículas
-        vetor_Num_particulas = range(self.Num_particulas)  # Vetor_ID_PARTICULA
-
-        # Iterações
-        ithist = 0 # contador do histórico
+        # ----------------------------------------------------------------------------------------
+        # DESENVOLVIMENTO DAS ITERAÇÕES
+        # ----------------------------------------------------------------------------------------
+        # lista com o número das partículas (evitar um range dentro do for) - obtem todos os ID's das partículas
+        vetor_Num_particulas = range(self.Num_particulas)
+        # lista com os índices das iterações nas quais o desempenho será avaliado
         self.index_desempenho = [(int((self.itmax-1)/self.n_desempenho))*k for k in xrange(1,self.n_desempenho+1)]
-        itdesempenho = 0
+        if self.index_desempenho[-1] != self.itmax-1: #forçando que o último valor salvo seja da última iteração
+            self.index_desempenho[-1] = self.itmax-1
+        # Inicialização de contadores
+        ithist = 0       # contador para as listas de histórico histórico
+        itdesempenho = 0 # contador para as listas de desemoenho
+
+        # Inicialização de variáveis atributos do PSO
         velocidade_ideal = 0
-        w = self.w[0]; C1 = None; C2 = None; Vreinit = None
-        for it in xrange(1, self.itmax):  # a iteração 0 é a inicialização
+        w = self.w[0]
+        C1 = None
+        C2 = None
+        Vreinit = None
+
+        # Desenvolvimento das iterações, a partir da 1, pois a 0 é a inicialização
+        for it in xrange(1, self.itmax):
 
             total_particulas_atendidas = 0  # Contagem de partículas que finalizaram a execução
 
-            # Aquisição de Controle_Iteração, para iniciar a iteração
+            # Aquisição da Lock Controle_Iteração, para iniciar a iteração, o release só ocorre quando todas as partículas
+            # terminarem sua execução
             Controle_Iteracao.acquire()
+
+            # Caso a keyword printit seja True, será printado
             if printit == True:
                 sys.stdout.write('ITERACAO: ' + str(it) + '\n')
                 sys.stdout.flush()
@@ -1259,28 +1297,30 @@ class PSO:
                                       self.limite_inferior, ID_particle, self.Num_particulas, self.args_model)
                 particula.start()
 
-            # A execução aguarda a liberação (release) de Controle_Iteração
+            # A execução aguarda a liberação (release) de Controle_Iteração, pois daqui em diantes todas as partículas
+            # devem ter finalizado
             Controle_Iteracao.acquire()
 
+            # Caso o método gbest seja Enxame ele é aqui atualizado e não dentro das partículas
             if self.metodo.gbest == 'Enxame':
                 if min(vetor_fitness) < best_fitness:
                     best_ID_particle = argmin(vetor_fitness)
                     best_fitness = vetor_fitness[best_ID_particle]
                     gbest = vetor_posicoes[best_ID_particle]
 
-            if ithist > self.n_historico-1: # reinicio o contator do histórico
+            if ithist > self.n_historico-1: # reinicio o contator do histórico, pois o mesmo está cheio
                 ithist = 0
-            # Armazenamento das informações em variáveis da classe (disponíveis para o Programa Principal)
+
+            # Armazenamento das informações:
+            # histórico
             self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
             self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
-
             ithist+=1
+            # desempenho
+            if self.index_desempenho[itdesempenho] == it: # desempenho só é salvo em pontos específicos
 
-            if self.index_desempenho[itdesempenho] == it:
-                # Cálculo de parâmetros de avaliação, médias das iterações.
-
-                self.media_fitness[itdesempenho] = mean(self.historico_fitness[ithist-1])
-                self.desvio_fitness[itdesempenho] = std(self.historico_fitness[ithist-1], ddof=1)/max([best_fitness, 1e-17])
+                self.media_fitness[itdesempenho] = mean(vetor_fitness)
+                self.desvio_fitness[itdesempenho] = std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17])
                 self.historico_w[itdesempenho] = w
                 self.historico_best_fitness[itdesempenho] = best_fitness
                 self.velocidade_ideal[itdesempenho] = velocidade_ideal
@@ -1297,13 +1337,17 @@ class PSO:
             # Liberação da proxima iteração
             Controle_Iteracao.release()
 
+        # ----------------------------------------------------------------------------------------
+        # PROCEDIMENTOS FINAIS
+        # ----------------------------------------------------------------------------------------
+        # Armazenar gbest e best_fitness
         self.gbest = gbest
         self.best_fitness = best_fitness
 
         for ithist in xrange(self.n_historico):
             for ID_particula in xrange(self.Num_particulas):
                 if isnan(self.historico_fitness[ithist][ID_particula]):
-                    raise NameError, u'Existe NaN como valor de função objetivo. Verificar.'
+                    raise ValueError('Existe NaN como valor de função objetivo. Verificar.')
 
     def Relatorios(self, base_path=None):
         '''
