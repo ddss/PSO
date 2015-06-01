@@ -824,7 +824,7 @@ class PSO:
         # tamanho do histórico
         self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
         # identificação do desempenho
-        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else 20
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([20,itmax])
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
         # -------------------------------------------------------------------------------
@@ -868,13 +868,15 @@ class PSO:
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DAS LISTAS DE HISTÓRICO
         # -------------------------------------------------------------------------------
+        # lista com os índices das iterações nas quais o desempenho será avaliado
+        self.index_desempenho = [(int((self.itmax-1)/self.n_desempenho))*k for k in xrange(0,self.n_desempenho+1)]
         # vetores baseados nas amostragens do desempenho
-        self.media_fitness = [0] * self.n_desempenho
-        self.media_velocidade = [0] * self.n_desempenho
-        self.velocidade_ideal = [0] * self.n_desempenho
-        self.desvio_fitness = [0] * self.n_desempenho
-        self.historico_w = [0] * self.n_desempenho
-        self.historico_best_fitness = [0] * self.n_desempenho
+        self.media_fitness = [0] * (self.n_desempenho+1)
+        self.media_velocidade = [0] * (self.n_desempenho+1)
+        self.velocidade_ideal = [0] * (self.n_desempenho+1)
+        self.desvio_fitness = [0] * (self.n_desempenho+1)
+        self.historico_w = [0] * (self.n_desempenho+1)
+        self.historico_best_fitness = [0] * (self.n_desempenho+1)
 
         # vetores baseados nos n_historico - salvam os n_historico últimos valores
         self.historico_fitness = [0]* self.n_historico
@@ -1221,13 +1223,12 @@ class PSO:
         # ----------------------------------------------------------------------------------------
         # lista com o número das partículas (evitar um range dentro do for) - obtem todos os ID's das partículas
         vetor_Num_particulas = range(self.Num_particulas)
-        # lista com os índices das iterações nas quais o desempenho será avaliado
-        self.index_desempenho = [(int((self.itmax-1)/self.n_desempenho))*k for k in xrange(1,self.n_desempenho+1)]
+
         if self.index_desempenho[-1] != self.itmax-1: #forçando que o último valor salvo seja da última iteração
             self.index_desempenho[-1] = self.itmax-1
         # Inicialização de contadores
         ithist = 0       # contador para as listas de histórico histórico
-        itdesempenho = 0 # contador para as listas de desemoenho
+        itdesempenho = 1 # contador para as listas de desemoenho
 
         # Inicialização de variáveis atributos do PSO
         velocidade_ideal = 0
@@ -1308,15 +1309,15 @@ class PSO:
                     best_fitness = vetor_fitness[best_ID_particle]
                     gbest = vetor_posicoes[best_ID_particle]
 
-            if ithist > self.n_historico-1: # reinicio o contator do histórico, pois o mesmo está cheio
-                ithist = 0
+            # Armazenamento de informações
+            # Armazenamento do histótico das posicoe e fitness
+            if it >= self.itmax - self.n_historico: # só será armazenado para as n_historico últimas iterações
 
-            # Armazenamento das informações:
-            # histórico
-            self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
-            self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
-            ithist+=1
-            # desempenho
+                self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
+                self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
+                ithist+=1
+
+            # Desempenho
             if self.index_desempenho[itdesempenho] == it: # desempenho só é salvo em pontos específicos
 
                 self.media_fitness[itdesempenho] = mean(vetor_fitness)
@@ -1442,6 +1443,21 @@ class PSO:
 
         * ``base_path`` (string, opcional): caminho completo onde os gráficos serão criados.
 
+
+        ======
+        Saídas
+        ======
+        Gráficos:
+        - Baseados no histórico: (O tamanho do histórico afeta estes gráficos)
+        * Funcao objetivo em três dimensões:
+        * Função objetivo em 1 dimensão
+        * Histograma dos parâmetros
+
+        - Baseados no Desempenho:
+        * Media e desvio padrão do fitness das partículas
+        * fator de inércia
+        * velocidade
+
         =========
         Exemplo 1
         =========
@@ -1467,6 +1483,7 @@ class PSO:
         * ``Nome_param`` (lista): define o nome dos parâmetros, na ordem que incluidos nos limites. Valor default ``[x1,x2,...,xn]``. Pode ser utilizado os códigos em LATEX, só utilizar: r'$codigo$'
         * ``Unid_param`` (lista): define o nome dos parâmetros, na ordem que incluidos nos limites. Valor default ``[adim,adim,...,adim]``. Pode ser utilizado os códigos em LATEX, só utilizar: r'$codigo$
         * ``FO2a2`` (bool): define se o gráfico da função objetivo é realizado também para os pares de parâmetros. Valor default: False (O gráfico da função objetivo é feito apenas para cada parâmetro separadamente). Qualquer entrada diferente é assumida como True.
+
         """
         # kwargs: legenda_posicao, azim, elev, Nome_param, Unid_param
         # Atribuição de valores default
