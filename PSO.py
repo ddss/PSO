@@ -75,7 +75,6 @@ class Particula(Thread):
 
         global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest
 
-        # TODO: reestruturar classe partícula: verificar necessidade de atributos self.
         Thread.__init__(self)
 
         # Atribuição da Função objetivo
@@ -132,7 +131,7 @@ class Particula(Thread):
         vel3 = [self.C2 * R2[j] * (gbest[j] - self.posicao[j]) for j in xrange(self.__num_parametros)]
         vel4 = [vel1[j] + vel2[j] + vel3[j] for j in xrange(self.__num_parametros)]
 
-        if self.metodo.inercia != 'TVIW-Adaptative-VI':
+        if self.metodo.inercia != self.metodo._metodosdisponiveis['inercia'][3]: # TVIW-Adaptative-VI
             # Verificação se a velocidade calculada é menor que Vmax, para cada dimensão
             self.velocidade = [0] * self.__num_parametros
 
@@ -223,10 +222,10 @@ class Particula(Thread):
             vetor_pbest[0][self.ID_particle] = self.posicao
 
         # Teste para verificar mudança no mínimo global:
-        if self.metodo.gbest == 'Particula':
+        if self.metodo.gbest == self.metodo._metodosdisponiveis['gbest'][0]: # Particula
             if self.fitness < best_fitness:
                 best_fitness = self.fitness
-                if self.metodo.busca == 'Otimo':
+                if self.metodo.busca == self.metodo._metodosdisponiveis['busca'][0]: # Otimo
                     gbest = self.posicao  # O valor de gbest é apenas atualizado, caso esteja se buscando o ponto ótimo
 
         Controle_variaveis.release()
@@ -238,9 +237,9 @@ class Particula(Thread):
         global Controle_Particula, Controle_Iteracao, total_particulas_atendidas, Controle_Total_Threads
 
         # Escolha do tipo de algoritmo a ser executado
-        if self.metodo.algoritmo == 'PSO':
+        if self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][0]:# PSO
             self.Execucao_PSO()
-        elif self.metodo.algoritmo == 'HPSO':
+        elif self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]:# HPSO
             self.Execucao_HPSO()
 
         self.Armazenamento()
@@ -658,12 +657,21 @@ class PSO:
         * ``Vreinit`` (lista com estrutura definida ou None): **velocidade de reinicialização** (usada apenas no algortimo de HPSO). A estrutura deve seguir ``[[Vreinit_1st_param,Vreinit_2nd_param,...,Vreinit_last_param],final_percentage]``. O primeiro argumento é uma lista com as velocidades de reinicializaçao iniciais para cada parâmetro. O segundo argumento (``final_percentage``) define as velocidades finais como uma porcetagem de ``Vmax``. Caso o método para ``Vreinit`` seja constante, ``final_percentage`` deve ser 1.0.
         
         **keywargs com valores default fixos**  (Caso não definidas, seus valores serão determinados pelo algoritmo)
-
+        * RELACIONADAS AO TVIW-Adaptive-vel:
         * ``deltaw``: parâmetro para de seleção para o cálculo de w, quando o método do peso de inércia é ``TVIW-Adaptative-VI``. Seu valor default é 0.1. Vide [8] para mais detalhes.
+
+        * RELACIONADAS AO HISTÓRICO DAS POSIÇÕES E VELOCIDADES:
+        * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (+ inicialização) (limita a quantidade de informações que são salvas). Default: min(itmax,500). O histórico salvara aos dados em intervalos regulares.
+        * ``init_historico`` (float): indica a partir de qual iteração o histórico de ser salvo. Deve estar compatível com n_historico e itmax. Default: 0
+
+        * RELACIONADAS AOS INDICADORES DE DESEMPENHO:
+        * ``n_desempenho`` (float): número de amostragens a serem realizadas, para indicação do desempenho ao algoritmo. Default: min(10,itmax) (+ inicialização)
+
+        * RELACIONADAS AO MODELO:
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
-        * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (limita a quantidade de informações que são salvas). Default: min(itmax,500)
+
+        * RELACIONADAS À CONVERGÊNCIA:
         * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 1
-        * ``n_desempenho`` (float): número de amostragens a serem realizadas, para indicação do desempenho ao algoritmo. Default: 20
 
         ==========
         Exemplo 3
@@ -751,7 +759,8 @@ class PSO:
                           'w':list, 'C1':list, 'C2':list,
                           'Vmax':list, 'Vreinit':list,
                           'otimo':list, 'deltaw':float,'args_model':None,
-                          'itmin':int, 'n_historico':int}
+                          'itmin':int, 'n_historico':int, 'n_desempenho':int,
+                          'init_historico':int, 'itmin':int}
 
         for key in kwargs.keys():
             # validação se a keyword existe
@@ -784,7 +793,26 @@ class PSO:
         # teste para avaliar se o ponto focal tem mesmo tamanho do número de parâmetros
         if kwargs.get('otimo') is not None:
             if len(kwargs.get('otimo')) != len(limite_superior):
-                raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior')
+                raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior.')
+
+        # testes para validar consistência de n_historico
+        if kwargs.get('n_historico') is not None:
+            # Warning: grande consumo de memória e n_historico for grande
+            if kwargs.get('n_historico') >= 3000:
+                warn('Grandes históricos (n_historicos) podem reduzir o desempenho e gerrar consumo excessivo de memória RAM para construção dos gráficos.')
+            # n_historico não pode ser maior do que o número máximo de iterações
+            if kwargs.get('n_historico') > itmax:
+                raise ValueError('O histórico não pode ser maior do que o número máximo de iterações.')
+
+        if kwargs.get('n_desempenho') is not None:
+            if kwargs.get('n_desempenho') > itmax:
+                raise ValueError('O n_desempenho deve ser, no máximo, o número de iterações'.format(itmax))
+
+            if itmax%kwargs.get('n_desempenho') != 0:
+                raise ValueError('n_desempenho deve ser divisor de itmax.')
+
+            if kwargs.get('n_desempenho') > 100:
+                warn('Muitas amostragens (n_desempenho) pode levar a um alto consumo de memória e reduzir o desempenho.')
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DO MÉTODO
@@ -808,8 +836,9 @@ class PSO:
         # ponto focal do algoritmo - quando o método de busca é Regiao ele subsitui gbest
         self.foco = kwargs.get('otimo')
 
-        # TRATAMENTO DAS KWARGS:
-        # Valores default das kwargs (Aquelas que não dependem do método escolhido):
+        # -------------------------------------------------------------------------------
+        # TRATAMENTO DE KEYWARGS
+        # -------------------------------------------------------------------------------        # Valores default das kwargs (Aquelas que não dependem do método escolhido):
         # posições de inicialização do algoritmo - limite superior:
         self.posinit_sup = kwargs.get('posinit_sup') if kwargs.get('posinit_sup') is not None else limite_superior
         # posições de inicialização do algoritmo - limite inferior:
@@ -823,8 +852,11 @@ class PSO:
         itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else 1
         # tamanho do histórico
         self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
+        # identificação
+        self.init_historico = kwargs.get('init_historico') if kwargs.get('init_historico') is not None else 0
         # identificação do desempenho
-        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([20,itmax])
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([10,itmax])
+
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
         # -------------------------------------------------------------------------------
@@ -839,17 +871,11 @@ class PSO:
                 raise ValueError('Dado que o método de busca é {}'.format(self.metodo._metodosdisponiveis['busca'][1])+
                                  ' necessário informar o valor de um ponto ótimo da função. keyword: otimo')
 
-        if self.n_historico >= 2000:
-            warn('Grandes históricos (n_historicos) podem levar a um alto consumo de memória e reduzir o desempenho')
+        if itmax - self.init_historico < self.n_historico:
+            raise ValueError('O histórico não pode ser iniciado em {}, pois não há iterações suficientes para suprir {} posições.'.format(self.init_historico,self.n_historico))
 
-        if self.n_historico > itmax:
-            raise ValueError('O histórico não pode ser maior do que o número máximo de iterações')
-
-        if self.n_desempenho > itmax:
-            raise ValueError('O n_desempenho deve ser, no máximo, o número de iterações'.format(itmax))
-
-        if self.n_desempenho > 100:
-            warn('Muitas amostragens (n_desempenho) pode levar a um alto consumo de memória e reduzir o desempenho')
+        if (itmax-self.init_historico)%self.n_historico:
+            raise ValueError('O tamanho do histórico está incompatível com o número de iterações. n_historico ({}) deve ser dividor de itmax({})-init_historico({})'.format(self.n_historico,itmax,self.init_historico))
 
         # -------------------------------------------------------------------------------
         # INICIALIZAÇÃO DE ATRIBUTOS CUJOS VALORES DEFAULT DEPENDEM DO MÉTODO
@@ -869,18 +895,21 @@ class PSO:
         # INICIALIZAÇÃO DAS LISTAS DE HISTÓRICO
         # -------------------------------------------------------------------------------
         # lista com os índices das iterações nas quais o desempenho será avaliado
-        self.index_desempenho = [(int((self.itmax-1)/self.n_desempenho))*k for k in xrange(0,self.n_desempenho+1)]
-        # vetores baseados nas amostragens do desempenho
-        self.media_fitness = [0] * (self.n_desempenho+1)
-        self.media_velocidade = [0] * (self.n_desempenho+1)
-        self.velocidade_ideal = [0] * (self.n_desempenho+1)
-        self.desvio_fitness = [0] * (self.n_desempenho+1)
-        self.historico_w = [0] * (self.n_desempenho+1)
-        self.historico_best_fitness = [0] * (self.n_desempenho+1)
+        self.index_desempenho = range(0,self.itmax,int(itmax/self.n_desempenho))
+        # lista com os índices das iterações nas quais o histórico de posições e velocidades serão salvos
+        self.index_historico = range(self.init_historico,self.itmax,int((itmax-self.init_historico)/self.n_historico))
 
-        # vetores baseados nos n_historico - salvam os n_historico últimos valores
-        self.historico_fitness = [0]* self.n_historico
-        self.historico_posicoes = [0]* self.n_historico
+        # vetores baseados nas amostragens do desempenho
+        self.media_fitness = [0.] * (self.n_desempenho+1)
+        self.media_velocidade = [0.] * (self.n_desempenho+1)
+        self.velocidade_ideal = [0.] * (self.n_desempenho+1)
+        self.desvio_fitness = [0.] * (self.n_desempenho+1)
+        self.historico_w = [0.] * (self.n_desempenho+1)
+        self.historico_best_fitness = [0.] * (self.n_desempenho+1)
+
+        # vetores baseados nos n_historico
+        self.historico_fitness = [0.]* (self.n_historico+1)
+        self.historico_posicoes = [0.]* (self.n_historico+1)
 
     def __defaultCoeficientes(self, w, C1, C2):
         '''
@@ -1185,7 +1214,7 @@ class PSO:
                 ID_particle += 1
 
         # Caso o método de busca seja Regiao, o ponto focal é forçadamente adicionado ao vetor_posicoes
-        if self.metodo.busca == 'Regiao':
+        if self.metodo.busca == self.metodo._metodosdisponiveis['busca'][1]: # Região
             vetor_posicoes[0] = self.foco
 
         # Inicializando os melhores valores das partículas (vetor_pbest) - variável global
@@ -1195,9 +1224,9 @@ class PSO:
         # Inicializando melhores valores globais do enxame (gbest)
         best_ID_particle = argmin(vetor_fitness) # partícula com menor valor de função objetivo
         best_fitness = vetor_fitness[best_ID_particle] # valor da função objetivo no ponto ótimo - variável global
-        if self.metodo.busca == 'Otimo':
+        if self.metodo.busca == self.metodo._metodosdisponiveis['busca'][0]: # Otimo
             gbest = vetor_posicoes[best_ID_particle] # variável global
-        elif self.metodo.busca == 'Regiao':
+        elif self.metodo.busca == self.metodo._metodosdisponiveis['busca'][1]: # Região
             gbest = self.foco
 
         # ----------------------------------------------------------------------------------------
@@ -1224,10 +1253,8 @@ class PSO:
         # lista com o número das partículas (evitar um range dentro do for) - obtem todos os ID's das partículas
         vetor_Num_particulas = range(self.Num_particulas)
 
-        if self.index_desempenho[-1] != self.itmax-1: #forçando que o último valor salvo seja da última iteração
-            self.index_desempenho[-1] = self.itmax-1
         # Inicialização de contadores
-        ithist = 0       # contador para as listas de histórico histórico
+        ithist = 1       # contador para as listas de histórico histórico
         itdesempenho = 1 # contador para as listas de desemoenho
 
         # Inicialização de variáveis atributos do PSO
@@ -1259,13 +1286,13 @@ class PSO:
             media_velocidade = mean(vel_aux)
 
             # Atualização de w, C1, C2 e Vreinit
-            if self.metodo.inercia == 'Constante':
-                w = self.w[0]
-            elif self.metodo.inercia == 'TVIW-linear':
+            if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0]: # TVIW-linear
                 w = self.w[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.w[0] - self.w[1])
-            elif self.metodo.inercia == 'TVIW-random':
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
                 w = 0.5 + random.uniform(0.0, 1.0) / 2
-            elif self.metodo.inercia == 'TVIW-Adaptative-VI':
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][2]: # Constante
+                w = self.w[0]
+            elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]: # TVIW-Adaptive-vel
 
                 velocidade_ideal = self.Vstart * (1 + cos(it * pi / self.Tend)) / 2
 
@@ -1277,14 +1304,14 @@ class PSO:
             elif self.metodo.inercia is None:
                 w = None
 
-            if self.metodo.aceleracao == 'Constante':
+            if self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][1]: # Constante
                 C1 = self.C1[0]
                 C2 = self.C2[0]
-            elif self.metodo.aceleracao == 'TVAC':
+            elif self.metodo.aceleracao == self.metodo._metodosdisponiveis['aceleracao'][0]: # TVAC
                 C1 = self.C1[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C1[0] - self.C1[1])
                 C2 = self.C2[0] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (self.C2[0] - self.C2[1])
 
-            if self.metodo.algoritmo == 'HPSO':
+            if self.metodo.algoritmo == self.metodo._metodosdisponiveis['algoritmo'][1]: # HPSO
                 Vreinit = []
                 for i in xrange(self.Num_parametros):
                     Vreinit.append(self.Vreinit[0][i] + (float(it) - 1) / (1 - float(self.itmax - 1)) * (
@@ -1303,15 +1330,15 @@ class PSO:
             Controle_Iteracao.acquire()
 
             # Caso o método gbest seja Enxame ele é aqui atualizado e não dentro das partículas
-            if self.metodo.gbest == 'Enxame':
+            if self.metodo.gbest == self.metodo._metodosdisponiveis['gbest'][1]: # Enxame
                 if min(vetor_fitness) < best_fitness:
                     best_ID_particle = argmin(vetor_fitness)
                     best_fitness = vetor_fitness[best_ID_particle]
                     gbest = vetor_posicoes[best_ID_particle]
 
             # Armazenamento de informações
-            # Armazenamento do histótico das posicoe e fitness
-            if it >= self.itmax - self.n_historico: # só será armazenado para as n_historico últimas iterações
+            # Armazenamento do histótico das posicoes e fitness
+            if self.index_historico[ithist] == it: # histórico só armazenado em pontos específicos
 
                 self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
                 self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
