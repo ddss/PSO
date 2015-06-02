@@ -1300,7 +1300,7 @@ class PSO:
         # teste para desviorelativo
         self.teste_parada_desvio = False if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada else True
         # teste para envolucaogbest
-        self.teste_parada_gbest = False if self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada else True
+        self.teste_parada_gbest = False if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada else True
 
         # Desenvolvimento das iterações, a partir da 1, pois a 0 é a inicialização
         while (it <= self.itmax-1) and self.it_break == False:
@@ -1421,29 +1421,52 @@ class PSO:
             it+=1
             # Liberação da proxima iteração
             Controle_Iteracao.release()
+        # caso as iteraçãoes sejam finalizadas, por ter atingido os critérios de convergência, os históricos
+        # devem ser corrigidos, pois serão menores do que aqueles inicialmente definidos. Além disso,
+        # último ponto avaliado será adicionado.
+        if self.it_break:
+            # ----------------------------------------------------------------------------------------
+            # LIMPEZA DE HISTÓRICO
+            # ----------------------------------------------------------------------------------------
+            # Caso o algoritmo saia prematuramente, faz-se necessário reduzir o histórico
+            # corrigindo as variáveis de index
+            self.itmax = it-1
+            self.n_desempenho = itdesempenho - 1
+            self.n_historico = ithist - 1
 
+            # Excluindo das listas as posições não avaliadas e adicionado o ponto final
+            self.index_historico =self.index_historico[0:self.n_historico]
+            self.index_historico[-1] = self.itmax
+            self.index_desempenho = self.index_desempenho[0:self.n_desempenho]
+            self.index_desempenho[-1] = self.itmax
 
-        # ----------------------------------------------------------------------------------------
-        # LIMPEZA DE HISTÓRICO
-        # ----------------------------------------------------------------------------------------
-        # Caso o algoritmo saia prematuramente, faz-se necessário reduzir o histórico
-        # corrigindo as variáveis de index
-        self.itmax = it-1
-        self.n_desempenho = itdesempenho - 1
-        self.n_historico = ithist - 1
+            self.historico_fitness = self.historico_fitness[0:self.n_historico]
+            self.historico_fitness[-1] = copy(vetor_fitness).tolist()
+            self.historico_posicoes = self.historico_posicoes[0:self.n_historico]
+            self.historico_posicoes[-1] = copy(vetor_posicoes).tolist()
 
-        # Excluindo das listas as posições não avaliadas
-        self.index_historico =self.index_historico[0:self.n_historico]
-        self.index_desempenho = self.index_desempenho[0:self.n_desempenho]
+            self.media_fitness = self.media_fitness[0:self.n_desempenho]
+            self.media_fitness[-1] = mean(vetor_fitness)
+            self.desvio_fitness = self.desvio_fitness[0:self.n_desempenho]
+            self.desvio_fitness[-1] = std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17])
 
-        self.historico_fitness = self.historico_fitness[0:self.n_historico]
-        self.historico_posicoes = self.historico_posicoes[0:self.n_historico]
-        self.media_fitness = self.media_fitness[0:self.n_desempenho]
-        self.desvio_fitness = self.desvio_fitness[0:self.n_desempenho]
-        self.historico_best_fitness = self.historico_best_fitness[0:self.n_desempenho]
-        self.historico_w = self.historico_w[0:self.n_desempenho]
-        self.media_velocidade = self.media_velocidade[0:self.n_desempenho]
-        self.velocidade_ideal = self.velocidade_ideal[0:self.n_desempenho]
+            self.historico_best_fitness = self.historico_best_fitness[0:self.n_desempenho]
+            self.historico_best_fitness[-1] = best_fitness
+
+            self.historico_w = self.historico_w[0:self.n_desempenho]
+            self.historico_w[-1] = w
+
+            self.velocidade_ideal = self.velocidade_ideal[0:self.n_desempenho]
+            self.velocidade_ideal[-1] = velocidade_ideal
+
+            self.media_velocidade = self.media_velocidade[0:self.n_desempenho]
+
+            aux1 = []
+            for j in xrange(self.Num_particulas):
+                aux2 = [abs(vetor_velocidades[j][k]) for k in xrange(self.Num_parametros)]
+                aux1.append(aux2)
+
+            self.media_velocidade[-1] = mean(aux1)
 
         # ----------------------------------------------------------------------------------------
         # PROCEDIMENTOS FINAIS
@@ -1457,7 +1480,7 @@ class PSO:
                 if isnan(self.historico_fitness[ithist][ID_particula]):
                     raise ValueError('Existe NaN como valor de função objetivo. Verificar.')
 
-    def Relatorios(self, base_path=None):
+    def Relatorios(self, base_path=None,**kwargs):
         '''
         Método para gerar os arquivos de texto contendo os resultados
         
@@ -1484,86 +1507,128 @@ class PSO:
              >>> Otimizacao.Graficos(base_path+'/Graficos/')     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO            
              
              
-        ================
-        Arquivos gerados
-        ================
-        
+        ==========================
+        Possíveis Arquivos gerados
+        ==========================
+        - gerado por padrão
+        * **Resumo.txt** : contém um resumo da otimização realizada
+        - deve ser solicitado (vide keywords)
         * **Best_fitness.txt** :contém o valor da função objetivo avaliada no ponto ótimo
         * **gbest.txt** : contém o valor do ponto ótimo encontrado pelo algoritmo de PSO
         * **historico_posicoes.txt** : contém o histórico das posições avaliados para cada particula a cada iteração.
         * **historico_fitness.txt**: contém o histórico de avaliação da função objetivo para cada particula a cada iteração.
-        * **Resumo.txt** : contém um resumo da otimização realizada
+
+        ================
+        Arquivos gerados
+        ================
+        * ``resumos_txt`` (bool): cria os arquivos best_fitness.txt, gbest.txt, historico_posicoes.txt, historico_fitness.txt
+        * ``relatorio`` (bool): cria o arquivo Resumo.txt
+
         '''
+
+        resumos_txt = False if kwargs.get('resumos_txt') is None else kwargs.get('resumos_txt')
+        relatorio   = True if kwargs.get('relatorio') is None else kwargs.get('relatorio')
 
         if base_path == None:
             base_path = os.getcwd() + "/PSO/Relatorios/"
         Validacao_Diretorio(base_path)
 
-        savetxt(base_path + 'Best_fitness.txt', matrix(self.best_fitness), fmt='%.18f')
-        outfile = open(base_path + 'historico_fitness.txt', 'w')
-        for elemento in self.historico_fitness:
-            outfile.write(str(elemento))
-            outfile.write('\n')
-        outfile.close()
-
-        outfile = open(base_path + 'historico_posicoes.txt', 'w')
-        for elemento in self.historico_posicoes:
-            outfile.write(str(elemento))
-            outfile.write('\n')
-        outfile.close()
-
-        # Resumo da estimação
-        with open(base_path + 'Resumo.txt', 'wb') as outfile:
-            outfile.write(('{:#^100}\n').format('RESUMO DO PSO'))
-            outfile.write(('{:-^100}\n').format('MÉTODO'))
-            outfile.write('Busca: {:8} | Parada: {} | Restrição: {} | GBEST: {} \n'.format(self.metodo.busca,
-                                                                                      self.metodo.parada,
-                                                                                      self.metodo.restricao,
-                                                                                      self.metodo.gbest))
-            outfile.write('Algoritmo: {:3} | Inercia: {} | Aceleracão: {} | Vreinit: {} \n'.format(self.metodo.algoritmo,
-                                                                                                 self.metodo.inercia,
-                                                                                                 self.metodo.aceleracao,
-                                                                                                 self.metodo.Vreinit))
-            outfile.write(('{:-^100}\n').format('INICIALIZAÇÃO DO ALGORITMO'))
-            outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
-            outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
-
-            outfile.write(('{:-^100}\n').format('RESTRIÇÕES'))
-            outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
-            outfile.write('Superior: {}\n'.format(self.limite_superior))
-            outfile.write('Inferior: {}\n'.format(self.limite_inferior))
-
-            outfile.write(('{:-^100}\n').format('SELEÇÃO DOS PARÂMETROS'))
-            outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
-            outfile.write('INÍCIO - w: {} | c1: {} | c2: {}\n'.format(self.historico_w[0], self.C1[0], self.C2[0]))
-            outfile.write('FIM    - w: {:.1f} | c1: {} | c2: {}\n'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
-            outfile.write('Vmax: {}\n'.format(self.Vmax))
-            outfile.write('Vreinit: {}\n'.format(self.Vreinit))
-            outfile.write('deltaw: {}\n'.format(self.deltaw))
-
-            outfile.write(('{:-^100}\n').format('ITERAÇÕES E HISTÓRICOS'))
-            outfile.write('Iterações: {} (1 de inicialização)\n'.format(self.itmax))
-            outfile.write('Quantidade mínima de iterações realizada : {}\n'.format(self.itmin))
-            outfile.write('Quantidades salvas para indicadores de desempenho: {}\n'.format(self.n_desempenho))
-            outfile.write('Quantidades salvas para histórico de posição e velocidade: {}\n'.format(self.n_historico))
-            outfile.write('Primeira posição para qual o histórico foi salvo: {}\n'.format(self.init_historico))
-
-
-            outfile.write(('{:-^100}\n').format('PARADA'))
-            outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'.\n')
-            outfile.write('Status             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'.\n')
-            outfile.write('Critério atendido  : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(not self.it_break,self.teste_parada_desvio,self.teste_parada_gbest)+'.\n')
-            if self.it_break:
-                outfile.write('Aviso              : Os critérios de convergência foram atingidos.\n')
-            else:
-                outfile.write('Aviso              : número máximo de iterações atingido.\n')
-
-            outfile.write(('{:-^100}\n').format('RESULTADOS'))
-            outfile.write('Ótimo: {} \n'.format(self.gbest))
-            outfile.write('Fitness: {} \n'.format(self.best_fitness))
-            outfile.write('Desvio relativo das partículas ao final: {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
-            outfile.write('Média das partículas ao final: {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+        if resumos_txt:
+            # historico do fitness
+            outfile = open(base_path + 'historico_fitness.txt', 'w')
+            for elemento in self.historico_fitness:
+                outfile.write(str(elemento))
+                outfile.write('\n')
             outfile.close()
+            # historico das posicoes
+            outfile = open(base_path + 'historico_posicoes.txt', 'w')
+            for elemento in self.historico_posicoes:
+                outfile.write(str(elemento))
+                outfile.write('\n')
+            outfile.close()
+
+            # index do histórico das posições e velocidades
+            outfile = open(base_path + 'index_historico.txt', 'w')
+            for elemento in self.index_historico:
+                outfile.write(str(elemento))
+                outfile.write('\n')
+            outfile.close()
+
+            # index do histórico para desempenho
+            outfile = open(base_path + 'index_desempenho.txt', 'w')
+            for elemento in self.index_desempenho:
+                outfile.write(str(elemento))
+                outfile.write('\n')
+            outfile.close()
+
+            # arquivo com gbest
+            savetxt(base_path + 'gbest.txt', matrix(self.gbest), fmt='%.18f')
+
+            # arquivo com best_fitness
+            savetxt(base_path + 'Best_fitness.txt', matrix(self.best_fitness), fmt='%.18f')
+
+        if relatorio:
+            # Resumo da estimação
+            with open(base_path + 'Resumo.txt', 'wb') as outfile:
+                outfile.write(('{:#^100}\n').format('RESUMO DO PSO'))
+                outfile.write(('{:-^100}\n').format('MÉTODO'))
+                outfile.write('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} \n'.format(self.metodo.algoritmo,
+                                                                                                     self.metodo.inercia,
+                                                                                                     self.metodo.aceleracao,
+                                                                                                     self.metodo.Vreinit))
+                outfile.write('Busca    : {:<8} | Restrição: {:<20} | Gbest     : {:<10} |  \n'.format(self.metodo.busca,
+                                                                                          str(self.metodo.restricao),
+                                                                                          self.metodo.gbest))
+
+                outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\n')
+                outfile.write(('{:-^100}\n').format('INICIALIZAÇÃO DO ALGORITMO'))
+                outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
+                outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
+
+                outfile.write(('{:-^100}\n').format('RESTRIÇÕES'))
+                outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
+                outfile.write('Superior  : {}\n'.format(self.limite_superior))
+                outfile.write('Inferior  : {}\n'.format(self.limite_inferior))
+
+                outfile.write(('{:-^100}\n').format('SELEÇÃO DOS PARÂMETROS'))
+                outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
+                outfile.write('Peso de inércia e fatores de aceleração:\n')
+                outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[0], self.C1[0], self.C2[0]))
+                outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
+                outfile.write('Vmax   : {}\n'.format(self.Vmax))
+                outfile.write('Vreinit: {}\n'.format(self.Vreinit))
+                outfile.write('deltaw : {}\n'.format(self.deltaw))
+
+                outfile.write(('{:-^100}\n').format('ITERAÇÕES'))
+                outfile.write('Iterações: {} (+ 1 de inicialização)\n'.format(self.itmax))
+                outfile.write('Número mínimo de iterações realizadas : {}\n'.format(self.itmin))
+
+                outfile.write(('{:-^100}\n').format('PARADA'))
+                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\n')
+                outfile.write('Status             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\n')
+                # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
+                testes_parada = [str(not self.it_break), str(self.teste_parada_desvio and self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada), str(self.teste_parada_gbest and self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada)]
+                outfile.write('Critério atendido  : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*testes_parada)+'\n')
+                if self.it_break:
+                    outfile.write('Aviso              : O(s) critério(s) de convergência foi/foram atingido(s).\n')
+                else:
+                    outfile.write('Aviso              : número máximo de iterações atingido.\n')
+
+                outfile.write(('{:-^100}\n').format('RESULTADOS'))
+                outfile.write('Ótimo  : {} \n'.format(self.gbest))
+                outfile.write('Fitness: {} \n'.format(self.best_fitness))
+                outfile.write('Desvio relativo das partículas ao final: {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
+                outfile.write('Média das partículas ao final          : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+
+                outfile.write(('{:-^100}\n').format('HISTÓRICOS'))
+                outfile.write('HISTÓRICO DE DESEMPENHO:\n')
+                outfile.write('    Tamanho do histórico de desempenho: {}\n'.format(self.n_desempenho))
+                outfile.write('\n')
+                outfile.write('HISTÓRICO DE POSIÇÕES E VELOCIDADES:\n')
+                outfile.write('    Tamanho do histórico para posição e velocidade  : {}\n'.format(self.n_historico))
+                outfile.write('    Primeira posição para qual o histórico foi salvo: {}\n'.format(self.init_historico))
+                outfile.write(('{:#^100}\n').format('#'))
+                outfile.close()
 
     def Graficos(self, base_path=None, **kwargs):
         """
