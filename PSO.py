@@ -40,7 +40,7 @@ from threading import Thread, Lock, BoundedSemaphore
 from numpy import random, min, argmin, copy, matrix, multiply, random, size, min, \
     max, copysign, ones, mean, std, sqrt, cos, pi, sort, argsort, savetxt
 from scipy.misc import factorial
-from math import isnan
+from math import isnan, ceil
 import codecs
 
 # Importação de pacotes para gráficos
@@ -287,7 +287,7 @@ class Metodo:
 
         * ``gbest``: ``Particula`` ou ``Enxame``
 
-        * ``parada``: ``itmax`` ou ``desviorelativo`` ou ``evolucaogbest``
+        * ``parada``: [``itmax`` e/ou ``desviorelativo`` e/ou ``evolucaogbest``]
                 
         ================
         Valores default:
@@ -311,7 +311,7 @@ class Metodo:
         
         * ``gbest``: define como a atualização de ``gbest`` (ponto ótimo) é realizada. Se o método de busca é ``Otimo``, então ``Particula`` . Caso o método de busca seja ``Regiao``, então ``Enxame``.
 
-        * ``parada``: define como o algoritmo de PSO deve finalizar sua execução
+        * ``parada``: define como o algoritmo de PSO deve finalizar sua execução. Se o algoritmo for PSO, então ['evolucaogbest','desviorelativo'], caso contrário, HPSO, então ['evolucaogbest']
         '''
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
@@ -345,26 +345,35 @@ class Metodo:
 
             if metodo[key] is not None:
                 # Teste para validar se o conteúdo são strings (exceto para a chave restrição)
-                if not isinstance(metodo[key],str) and key != 'restricao':
+                if not isinstance(metodo[key],str) and key != 'restricao' and key != 'parada':
                     raise TypeError('Para a chave {} o valor {} deve ser um string'.format(key,metodo[key]))
 
                 # Teste para validar se o conteúdo da chave restrição é bool
                 if not isinstance(metodo[key],bool) and key == 'restricao':
                     raise TypeError('Para a chave {} o valor {} deve ser um bool'.format(key,metodo[key]))
 
+                # Teste para validar se o conteúdo da chave parada é list
+                if not isinstance(metodo[key],list) and key == 'parada':
+                    raise TypeError('Para a chave {} o valor {} deve ser uma lista de critérios de parada'.format(key,metodo[key]))
+
                 # Teste para validar se o conteúdo definido está disponível
-                if metodo[key] not in self._metodosdisponiveis[key]:
+                if metodo[key] not in self._metodosdisponiveis[key] and key != 'parada':
                     raise NameError(u'The value {} is not available for key {}!'.format(metodo[key], key)+u' Available values: '+
                                 ', '.join(self._metodosdisponiveis[key])+u'.')
+
+                # Teste para validar se o conteúdo da chave parada está disponível
+                if key == 'parada':
+                    if not set(metodo[key]).issubset(self._metodosdisponiveis[key]):
+                        raise NameError('Foram definidos valores não disponíveis para métodos de parada. Valores disponíveis: '+
+                                        ', '.join(self._metodosdisponiveis[key])+'.')
         # -------------------------------------------------------------------------------
         # ATRIBUTOS
         # -------------------------------------------------------------------------------
         # Atributos cujos valores default que independem de outros:
         # retrições são por default, ativas
         self.restricao = metodo.get('restricao') if metodo.get('restricao') is not None else True
-        # critério de parada é, por default, itmax
-        self.parada = metodo.get('parada') if metodo.get('parada') is not None else self._metodosdisponiveis['parada'][0]
-
+        # critério de parada é, por default, evolucaogbest e/ou desviorelativo
+        self.parada = metodo.get('parada')
         # Atributos cujos valores default que dependem de outros, serão inicializados pelo método InicializacaoDefault:
         self.busca = metodo.get('busca')
         self.algoritmo = metodo.get('algoritmo')
@@ -435,8 +444,19 @@ class Metodo:
                 self.gbest = self._metodosdisponiveis['gbest'][1] # Enxame
 
         # PARADA
-        if self.parada == self._metodosdisponiveis['parada'][1] and self.algoritmo == self._metodosdisponiveis['algoritmo'][1]:
-            raise ValueError('O critério de parada {} não pode ser usado com o algoritmo {}'.format(self.parada,self.algoritmo))
+        # atribuindo default
+        if self.parada is None:
+            if self.algoritmo == self._metodosdisponiveis['algoritmo'][0]: # PSO
+                self.parada = [self._metodosdisponiveis['parada'][1],self._metodosdisponiveis['parada'][2]] # - evoluação gbest e devio relativo
+            elif self.algoritmo == self._metodosdisponiveis['algoritmo'][1]: # HPSO
+                self.parada = [self._metodosdisponiveis['parada'][2]] # - evoluação gbest
+
+        # HPSO não pode ser usado com o critério de parada desviorelativo
+        if self._metodosdisponiveis['parada'][1] in self.parada and self.algoritmo == self._metodosdisponiveis['algoritmo'][1]:
+            raise ValueError('O critério de parada {} não pode ser usado com o algoritmo {}'.format(self._metodosdisponiveis['parada'][1],self.algoritmo))
+        # itmax como critério de parada deve ser usado sozinho
+        if self._metodosdisponiveis['parada'][0] in self.parada and len(self.parada) != 1:
+            raise ValueError('O critério {} deve ser usado sozinho.'.format(self._metodosdisponiveis['parada'][0]))
 
 class PSO:
     def __init__(self, limite_superior, limite_inferior, metodo={'busca': 'Otimo'}, Num_particulas=30, itmax=2000,
@@ -574,7 +594,7 @@ class PSO:
                 * ``TVVr-linear`` (time varying reinitialization velocity) : a velocidade de reinicialização decresce linearmente ao longo das iterações
                 * ``Constante`` a velocidade é mantida constante
 
-            * ``parada`` (chave): define o critério de parada do algoritmo
+            * ``parada`` (chave): define o critério de parada do algoritmo. Os valores devem ser incluídos dentro de uma lista
 
                 * ``itmax``: o algoritmo para se execução quando atinge o número máximo de iterações
                 * ``desviorelativo``: o algoritmo para sua execução quando o desvio relativo dos valores de função objetivo obtidos pelas partículas e o valor de gbest (ponto ótimo) é alcançado. Útil para evitar excessivo número de iterações. Caso o algorimo seja o HPSO, este critério não deve ser utilizado.
@@ -671,7 +691,9 @@ class PSO:
         * ``args_model``: lista que possui argumentos extras a serem passados para a função objetivo. Seu valor default é uma lista vazia.
 
         * RELACIONADAS À CONVERGÊNCIA:
-        * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 1
+        * ``itmin`` (float): número mínimo de iterações a ser realizado pelo algoritmo (útil para evitar convergência prematura, caso o critério de convergência esteja ativado). Default: 50% de itmax
+        * ``parada_gbest``: número de iteração nos quais os valores de gbest devem se estabilizar para o algoritmo parar. Default: 10% de itmax
+        * ``parada_desvio``: valor de desviorelativo que deve ocorrer para o algoritmo parar. Default: 0.
 
         ==========
         Exemplo 3
@@ -760,7 +782,8 @@ class PSO:
                           'Vmax':list, 'Vreinit':list,
                           'otimo':list, 'deltaw':float,'args_model':None,
                           'itmin':int, 'n_historico':int, 'n_desempenho':int,
-                          'init_historico':int, 'itmin':int}
+                          'init_historico':int, 'itmin':int,
+                          'parada_gbest':int,'parada_desvio':float}
 
         for key in kwargs.keys():
             # validação se a keyword existe
@@ -795,6 +818,11 @@ class PSO:
             if len(kwargs.get('otimo')) != len(limite_superior):
                 raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior.')
 
+        # validação de itmin
+        if kwargs.get('itmin') is not None:
+            if kwargs.get('itmin')>itmax:
+                raise ValueError('O número mínimo de iterações (itmin) deve ser menor do que itmax.')
+
         # testes para validar consistência de n_historico
         if kwargs.get('n_historico') is not None:
             # Warning: grande consumo de memória e n_historico for grande
@@ -811,7 +839,7 @@ class PSO:
             if itmax%kwargs.get('n_desempenho') != 0:
                 raise ValueError('n_desempenho deve ser divisor de itmax.')
 
-            if kwargs.get('n_desempenho') > 100:
+            if kwargs.get('n_desempenho') > 3000:
                 warn('Muitas amostragens (n_desempenho) pode levar a um alto consumo de memória e reduzir o desempenho.')
 
         # -------------------------------------------------------------------------------
@@ -847,16 +875,18 @@ class PSO:
         self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
         # Argumentos extras a serem enviados para o modelo:
         self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
-        # TODO: Implementar itmin
-        # Número mínimo de iterações, caso não definido será 1
-        itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else 1
         # tamanho do histórico
-        self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([500, itmax])
+        self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([1000, itmax])
         # identificação
         self.init_historico = kwargs.get('init_historico') if kwargs.get('init_historico') is not None else 0
         # identificação do desempenho
-        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([10,itmax])
-
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([int(ceil(0.1*itmax)),itmax])
+        # Número mínimo de iterações, caso não definido será 50% das iterações
+        self.itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else int(ceil(itmax/3))
+        # Critério de parada para gbest: número de iterações que o ponto ótimo não muda
+        self.parada_gbest = kwargs.get('parada_gbest') if kwargs.get('parada_gbest') is not None else int(0.1*itmax)
+        # Critério de parada de desvio: qual o valor do desvio relativo para o qual o algoritmo deve parar
+        self.parada_desvio = kwargs.get('parada_desvio') if kwargs.get('parada_desvio') is not None else 0.
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
         # -------------------------------------------------------------------------------
@@ -1252,20 +1282,25 @@ class PSO:
         # ----------------------------------------------------------------------------------------
         # lista com o número das partículas (evitar um range dentro do for) - obtem todos os ID's das partículas
         vetor_Num_particulas = range(self.Num_particulas)
-
+        # incialização
+        evolucaogbest = sum([abs(i) for i in gbest])
         # Inicialização de contadores
         ithist = 1       # contador para as listas de histórico histórico
         itdesempenho = 1 # contador para as listas de desemoenho
-
+        it = 1 # contador de iterações
+        it_gbest = 0
         # Inicialização de variáveis atributos do PSO
         velocidade_ideal = 0
         w = self.w[0]
         C1 = None
         C2 = None
         Vreinit = None
+        it_break = False
+        self.teste_parada_desvio = False if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada else True
+        self.teste_parada_gbest = False if self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada else True
 
         # Desenvolvimento das iterações, a partir da 1, pois a 0 é a inicialização
-        for it in xrange(1, self.itmax):
+        while (it <= self.itmax-1) and it_break == False:
 
             total_particulas_atendidas = 0  # Contagem de partículas que finalizaram a execução
 
@@ -1342,7 +1377,7 @@ class PSO:
 
                 self.historico_fitness[ithist] = copy(vetor_fitness).tolist()
                 self.historico_posicoes[ithist] = copy(vetor_posicoes).tolist()
-                ithist+=1
+                ithist += 1
 
             # Desempenho
             if self.index_desempenho[itdesempenho] == it: # desempenho só é salvo em pontos específicos
@@ -1360,10 +1395,52 @@ class PSO:
 
                 self.media_velocidade[itdesempenho] = mean(aux1)
 
-                itdesempenho+=1
+                itdesempenho += 1
 
+            if it > self.itmin:
+
+                if self.metodo._metodosdisponiveis['parada'][0] not in self.metodo.parada:# itmax
+
+                    if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:# desviorelativo
+                        self.teste_parada_desvio = True if std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17]) <= self.parada_desvio else False
+
+                    if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:# evolucaogbest
+                        if evolucaogbest == sum([abs(i) for i in gbest]):
+                            it_gbest += 1
+
+                        evolucaogbest = sum([abs(i) for i in gbest])
+
+                        self.teste_parada_gbest = True if it_gbest > self.parada_gbest else False
+
+                    it_break = self.teste_parada_desvio and self.teste_parada_gbest
+
+            # incremento para a próxima iteração
+            it+=1
             # Liberação da proxima iteração
             Controle_Iteracao.release()
+
+
+        # ----------------------------------------------------------------------------------------
+        # LIMPEZA DE HISTÓRICO
+        # ----------------------------------------------------------------------------------------
+        # Caso o algoritmo saia prematuramente, faz-se necessário reduzir o histórico
+        # corrigindo as variáveis de index
+        self.itmax = it-1
+        self.n_desempenho = itdesempenho - 1
+        self.n_historico = ithist - 1
+
+        # Excluindo das listas as posições não avaliadas
+        self.index_historico =self.index_historico[0:self.n_historico]
+        self.index_desempenho = self.index_desempenho[0:self.n_desempenho]
+
+        self.historico_fitness = self.historico_fitness[0:self.n_historico]
+        self.historico_posicoes = self.historico_posicoes[0:self.n_historico]
+        self.media_fitness = self.media_fitness[0:self.n_desempenho]
+        self.desvio_fitness = self.desvio_fitness[0:self.n_desempenho]
+        self.historico_best_fitness = self.historico_best_fitness[0:self.n_desempenho]
+        self.historico_w = self.historico_w[0:self.n_desempenho]
+        self.media_velocidade = self.media_velocidade[0:self.n_desempenho]
+        self.velocidade_ideal = self.velocidade_ideal[0:self.n_desempenho]
 
         # ----------------------------------------------------------------------------------------
         # PROCEDIMENTOS FINAIS
@@ -1416,7 +1493,7 @@ class PSO:
         '''
 
         if base_path == None:
-            base_path = os.getcwd() + "/PSO/Result_txt/"
+            base_path = os.getcwd() + "/PSO/Relatorios/"
         Validacao_Diretorio(base_path)
 
         savetxt(base_path + 'Best_fitness.txt', matrix(self.best_fitness), fmt='%.18f')
@@ -1432,33 +1509,45 @@ class PSO:
             outfile.write('\n')
         outfile.close()
 
-        savetxt(base_path + 'gbest.txt', matrix(self.gbest), fmt='%.18f')
-
         # Resumo da estimação
-        outfile = codecs.open(base_path + 'Resumo.txt', 'w', 'utf-8')
-        outfile.write(u'RESUMO DO PSO\n')
-        outfile.write('--------------------------------' + '\n')
-        outfile.write(u'MÉTODO' + '\n')
-        outfile.write(u'Algoritmo: %s | Inercia: %s | Aceleracão: %s | Vreinit: %s' % (self.metodo.algoritmo,
-                                                                                       self.metodo.inercia,
-                                                                                       self.metodo.aceleracao,
-                                                                                       self.metodo.Vreinit) + '\n')
-        outfile.write('--------------------------------' + '\n')
-        outfile.write(u'Seleção dos parâmetros, partículas e iterações' + '\n')
-        outfile.write(u'INÍCIO - w: %s | c1: %s | c2: %s' % (self.w[0], self.C1[0], self.C2[0]) + '\n')
-        outfile.write(u'FIM    - w: %s | c1: %s | c2: %s' % (self.w[1], self.C1[1], self.C2[1]) + '\n')
-        outfile.write(u'Vmax: %s' % self.Vmax + '\n')
-        outfile.write(u'Vreinit: %s' % self.Vreinit + '\n')
-        outfile.write(u'deltaw: %s' % self.deltaw + '\n')
-        outfile.write(u'Número de partículas: %s' % (self.Num_particulas,) + '\n')
-        outfile.write(u'Iterações: %s (1 de inicialização, %s de Busca)' % (self.itmax, self.itmax - 1) + '\n')
-        outfile.write('--------------------------------' + '\n')
-        outfile.write(u'RESULTADOS' + '\n')
-        outfile.write(u'ótimo: %s | fitness: %s \n' % (self.gbest, self.best_fitness))
-        outfile.write(u'Desvio relativo: %s\n'%(self.desvio_fitness[self.n_desempenho-1]/max([1e-16,self.best_fitness])))
-        outfile.write(u'Desvio: %s\n'%(self.desvio_fitness[self.n_desempenho-1]))
-        outfile.write(u'Fitness: %s\n'%(self.best_fitness))
-        outfile.close()
+        with open(base_path + 'Resumo.txt', 'wb') as outfile:
+            outfile.write(('{:#^100}\n').format('RESUMO DO PSO'))
+            outfile.write(('{:-^100}\n').format('MÉTODO'))
+            outfile.write('Busca: {:8} | Parada: {} | Restrição: {} | GBEST: {} \n'.format(self.metodo.busca,
+                                                                                      self.metodo.parada,
+                                                                                      self.metodo.restricao,
+                                                                                      self.metodo.gbest))
+            outfile.write('Algoritmo: {:3} | Inercia: {} | Aceleracão: {} | Vreinit: {} \n'.format(self.metodo.algoritmo,
+                                                                                                 self.metodo.inercia,
+                                                                                                 self.metodo.aceleracao,
+                                                                                                 self.metodo.Vreinit))
+            outfile.write(('{:-^100}\n').format('INICIALIAÇÃO DO ALGORITMO'))
+            outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
+            outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
+            outfile.write(('{:-^100}\n').format('RESTRIÇÕES'))
+            outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
+            outfile.write('Superior: {}\n'.format(self.limite_superior))
+            outfile.write('Inferior: {}\n'.format(self.limite_inferior))
+            outfile.write(('{:-^100}\n').format('SELEÇÃO DOS PARÂMETROS'))
+            outfile.write('Seleção dos parâmetros, partículas e iterações' + '\n')
+            outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
+            outfile.write('INÍCIO - w: {} | c1: {} | c2: {}\n'.format(self.w[0], self.C1[0], self.C2[0]))
+            outfile.write('FIM    - w: {} | c1: {} | c2: {}\n'.format(self.w[1], self.C1[1], self.C2[1]))
+            outfile.write('Vmax: {}\n'.format(self.Vmax))
+            outfile.write('Vreinit: {}\n'.format(self.Vreinit))
+            outfile.write('deltaw: {}\n'.format(self.deltaw))
+            outfile.write(('{:-^100}\n').format('ITERAÇÕES'))
+            outfile.write('Iterações: {} (1 de inicialização)\n'.format(self.itmax))
+            outfile.write('Quantidades salvas para indicadores de desempenho: {}\n'.format(self.n_desempenho))
+            outfile.write('Quantidades salvas para histórico de posição e velocidade: {}\n'.format(self.n_historico))
+            outfile.write(('{:-^100}\n').format('PARADA'))
+            outfile.write('Critérios de parada: \n')
+            outfile.write(('{:-^100}\n').format('RESULTADOS'))
+            outfile.write('Ótimo: {} | fitness: {} \n'.format(self.gbest, self.best_fitness))
+            outfile.write('Desvio relativo ao final: {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
+            outfile.write('Média das partículas da função objetivo ao final: {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+
+            outfile.close()
 
     def Graficos(self, base_path=None, **kwargs):
         """
@@ -1584,7 +1673,7 @@ class PSO:
         plot(self.index_desempenho, self.historico_best_fitness, 'r-', label=u'Best Fitness')
         ax.yaxis.grid(color='gray', linestyle='dashed')
         ax.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.itmax))
+        xlim((0, self.index_desempenho[-1]))
         ylabel(u"Média de " + r"$\Phi$", fontsize=15)
         legend(loc=legenda_posicao)
 
@@ -1592,7 +1681,7 @@ class PSO:
         plot(self.index_desempenho, self.desvio_fitness, 'b-', label=u'Desvio-padrão')
         ax2.yaxis.grid(color='gray', linestyle='dashed')
         ax2.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.itmax))
+        xlim((0, self.index_desempenho[-1]))
         xlabel(u"Iterações", fontsize=15)
         ylabel(u"Desvio-padrão relativo de " + r"$\Phi$", fontsize=15)
         legend(loc=legenda_posicao)
@@ -1609,7 +1698,7 @@ class PSO:
             plot(self.index_desempenho, self.velocidade_ideal, 'r-')
         ax.yaxis.grid(color='gray', linestyle='dashed')
         ax.xaxis.grid(color='gray', linestyle='dashed')
-        xlim((0, self.n_historico))
+        xlim((0, self.index_desempenho[-1]))
         xlabel(u"Iterações", fontsize=15)
         ylabel(u"Média de " + r"$\nu$", fontsize=15)
         ax.yaxis.set_major_formatter(formatter)
@@ -1623,7 +1712,7 @@ class PSO:
             plot(self.index_desempenho, self.historico_w, 'b-')
             ax3.yaxis.grid(color='gray', linestyle='dashed')
             ax3.xaxis.grid(color='gray', linestyle='dashed')
-            xlim((0, self.itmax))
+            xlim((0, self.index_desempenho[-1]))
             if self.metodo.inercia == 'TVIW-linear':
                 ylim((self.w[1], self.w[0]))
             xlabel(u"Iterações")
@@ -1833,9 +1922,9 @@ class PSO:
             Combinacoes = int(factorial(self.Num_parametros) / (factorial(self.Num_parametros - 2) * factorial(2)))
 
             for it in xrange(self.itmax):
-                p1 = 0;
-                p2 = 1;
-                cont = 0;
+                p1 = 0
+                p2 = 1
+                cont = 0
                 passo = 1
                 for pos in xrange(Combinacoes):
                     dir2 = base_path + "/Projecao_Combinacoes_" + str(pos) + "/"
