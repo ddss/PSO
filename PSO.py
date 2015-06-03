@@ -757,8 +757,6 @@ class PSO:
                 
         [11] EBERHART, R.; SHI, Y. Comparing inertia weights and constriction factors in particle swarm optimization. In: Proceedings of the 2000 Congress on Evolutionary Computation. CEC00 (Cat. No.00TH8512). IEEE, 2000. v. 1, n. 7, p. 84–88.
         """
-        # TODO: Implementar critérios de parada
-
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
         # -------------------------------------------------------------------------------
@@ -1427,15 +1425,15 @@ class PSO:
             # ----------------------------------------------------------------------------------------
             # Caso o algoritmo saia prematuramente, faz-se necessário reduzir o histórico
             # corrigindo as variáveis de index
-            self.itmax = it-1
+            self.itmax = it # para considerar que a primeira iteração foi de inicialização
             self.n_desempenho = itdesempenho - 1
             self.n_historico = ithist - 1
 
             # Excluindo das listas as posições não avaliadas e adicionado o ponto final
-            self.index_historico =self.index_historico[0:self.n_historico]
-            self.index_historico[-1] = self.itmax
+            self.index_historico = self.index_historico[0:self.n_historico]
+            self.index_historico[-1] = self.itmax-1 # o começo é zero
             self.index_desempenho = self.index_desempenho[0:self.n_desempenho]
-            self.index_desempenho[-1] = self.itmax
+            self.index_desempenho[-1] = self.itmax-1 # o começo é zero
 
             self.historico_fitness = self.historico_fitness[0:self.n_historico]
             self.historico_fitness[-1] = copy(vetor_fitness).tolist()
@@ -1601,7 +1599,7 @@ class PSO:
                 outfile.write('deltaw : {}\n'.format(self.deltaw))
 
                 outfile.write(('{:-^100}\n').format('ITERAÇÕES'))
-                outfile.write('Iterações: {} (+ 1 de inicialização)\n'.format(self.itmax))
+                outfile.write('Iterações: {} (sendo 1 de inicialização)\n'.format(self.itmax))
                 outfile.write('Número mínimo de iterações realizadas : {}\n'.format(self.itmin))
 
                 outfile.write(('{:-^100}\n').format('PARADA'))
@@ -1723,25 +1721,21 @@ class PSO:
             Nome_param = kwargs['Nome_param']
             if Nome_param is not None:
                 if len(Nome_param) != self.Num_parametros and len(Nome_param) != 0:
-                    raise NameError, u'Nome_param deve conter o nome para todos os parâmetros'
+                    raise NameError(u'Nome_param deve conter o nome para todos os parâmetros')
 
         if 'Unid_param' in kwargs.keys():
             Unid_param = kwargs['Unid_param']
             if Unid_param is not None:
                 if len(Unid_param) != self.Num_parametros and len(Unid_param) != 0:
-                    raise NameError, u'Unid_param deve conter as unidades para todos os parâmetros'
+                    raise NameError(u'Unid_param deve conter as unidades para todos os parâmetros')
 
             if all([unid is None for unid in Unid_param]):
                 Unid_param = None
 
-        if 'FO2a2' in kwargs.keys():
-            if kwargs['FO2a2'] == False:
-                FO2a2 = False
-            else:
-                FO2a2 = True
+        FO2a2 = True if 'FO2a2' not in kwargs.keys() else kwargs.get('FO2a2')
 
         if isinstance(azim, int) or isinstance(azim, float) or isinstance(elev, int) or isinstance(elev, float):
-            raise NameError, u'keywords azim e elev devem ser listas'
+            raise TypeError(u'keywords azim e elev devem ser listas')
 
         # Verificação da existência de diretório do diretório
         if base_path is None:
@@ -1862,7 +1856,7 @@ class PSO:
             fig.savefig(base_path + 'Funcao_objetivo_projecao_' + 'x%d' % (ix + 1) + '.png')
             close()
 
-        if (self.Num_parametros != 1) and (FO2a2 == True):
+        if (self.Num_parametros != 1) and FO2a2:
             # Gráfico tridimensioal da função objetivo
             Combinacoes = int(factorial(self.Num_parametros) / (factorial(self.Num_parametros - 2) * factorial(2)))
             p1 = 0
@@ -1999,7 +1993,7 @@ class PSO:
                 ax.set_xlabel(u'Iteração')
                 ax.set_ylabel(u'ID_Partícula')
                 ax.set_zlabel(u'Fitness / u.m')
-                ax.set_xlim((0.0, self.itmax))
+                ax.set_xlim((0.0, self.index_historico[-1]))
                 ax.set_zlim((self.best_fitness,max(self.historico_fitness)))
                 ax.set_ylim((0,self.Num_particulas))
                 len_it = len(str(i))
