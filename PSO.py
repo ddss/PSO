@@ -41,12 +41,9 @@ from numpy import random, min, argmin, copy, matrix, multiply, random, size, min
     max, copysign, ones, mean, std, sqrt, cos, pi, sort, argsort, savetxt
 from scipy.misc import factorial
 from math import isnan, ceil
-import codecs
 
 # Importação de pacotes para gráficos
-from matplotlib import use, cm, ticker
-
-use('Agg')
+from matplotlib import cm, ticker
 
 from matplotlib.pyplot import figure, axes, plot, subplot, xlabel, ylabel, \
     title, legend, savefig, xlim, ylim, close, gca, hist
@@ -1128,7 +1125,7 @@ class PSO:
         # VELOCIDADE DE INICIALIZAÇÃO - TVIW-Adaptivel
         # ------------------------------------------------------------------------------
         self.Vstart = abs((max(self.limite_superior) - min(self.limite_inferior)) / 2.0)
-        self.Tend = 0.95 * self.itmax
+        self.Tend = 0.95 * (self.itmax-1)
 
     def Busca(self, FO, printit=False):
         """
@@ -1517,11 +1514,14 @@ class PSO:
         * **gbest.txt** : contém o valor do ponto ótimo encontrado pelo algoritmo de PSO
         * **historico_posicoes.txt** : contém o histórico das posições avaliados para cada particula a cada iteração.
         * **historico_fitness.txt**: contém o histórico de avaliação da função objetivo para cada particula a cada iteração.
+        * **index_historico**: contém os pontos para os quais o histórico das posições e fitness foram gerados
+        * **index_desempenho**: contém os pontos para os quais o histórico para os indicadores de desempenho
 
         ================
         Arquivos gerados
         ================
-        * ``resumos_txt`` (bool): cria os arquivos best_fitness.txt, gbest.txt, historico_posicoes.txt, historico_fitness.txt
+        * ``resumos_txt`` (bool): cria os arquivos best_fitness.txt, gbest.txt, historico_posicoes.txt, historico_fitness.txt,
+        index_historico.txt, index_desempenho.txt
         * ``relatorio`` (bool): cria o arquivo Resumo.txt
 
         '''
@@ -1540,6 +1540,7 @@ class PSO:
                 outfile.write(str(elemento))
                 outfile.write('\n')
             outfile.close()
+
             # historico das posicoes
             outfile = open(base_path + 'historico_posicoes.txt', 'w')
             for elemento in self.historico_posicoes:
@@ -1547,7 +1548,7 @@ class PSO:
                 outfile.write('\n')
             outfile.close()
 
-            # index do histórico das posições e velocidades
+            # index do histórico das posições e fitness
             outfile = open(base_path + 'index_historico.txt', 'w')
             for elemento in self.index_historico:
                 outfile.write(str(elemento))
@@ -1613,6 +1614,12 @@ class PSO:
                     outfile.write('Aviso              : O(s) critério(s) de convergência foi/foram atingido(s).\n')
                 else:
                     outfile.write('Aviso              : número máximo de iterações atingido.\n')
+                if not self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada:
+                    outfile.write('Configurações:\n')
+                if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:
+                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\n'.format(self.parada_gbest))
+                if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:
+                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\n'.format(self.parada_desvio))
 
                 outfile.write(('{:-^100}\n').format('RESULTADOS'))
                 outfile.write('Ótimo  : {} \n'.format(self.gbest))
@@ -1624,8 +1631,8 @@ class PSO:
                 outfile.write('HISTÓRICO DE DESEMPENHO:\n')
                 outfile.write('    Tamanho do histórico de desempenho: {}\n'.format(self.n_desempenho))
                 outfile.write('\n')
-                outfile.write('HISTÓRICO DE POSIÇÕES E VELOCIDADES:\n')
-                outfile.write('    Tamanho do histórico para posição e velocidade  : {}\n'.format(self.n_historico))
+                outfile.write('HISTÓRICO DE POSIÇÕES E FITNESS:\n')
+                outfile.write('    Tamanho do histórico para posição e fitness     : {}\n'.format(self.n_historico))
                 outfile.write('    Primeira posição para qual o histórico foi salvo: {}\n'.format(self.init_historico))
                 outfile.write(('{:#^100}\n').format('#'))
                 outfile.close()
@@ -1955,18 +1962,18 @@ class PSO:
 
         if 'Nome_param' in kwargs.keys():
             Nome_param = kwargs['Nome_param']
-            if Nome_param != None:
+            if Nome_param is not None:
                 if len(Nome_param) != self.Num_parametros and len(Nome_param) != 0:
-                    raise NameError, u'Nome_param deve conter o nome para todos os parâmetros'
+                    raise ValueError('Nome_param deve conter o nome para todos os parâmetros')
 
         if 'Unid_param' in kwargs.keys():
             Unid_param = kwargs['Unid_param']
-            if Unid_param != None:
+            if Unid_param is not None:
                 if len(Unid_param) != self.Num_parametros and len(Unid_param) != 0:
-                    raise NameError, u'Unid_param deve conter as unidades para todos os parâmetros'
+                    raise ValueError('Unid_param deve conter as unidades para todos os parâmetros')
 
         if isinstance(azim, int) or isinstance(azim, float) or isinstance(elev, int) or isinstance(elev, float):
-            raise NameError, u'keywords azim e elev devem ser listas'
+            raise TypeError('keywords azim e elev devem ser listas')
 
         len_itmax = len(str(self.itmax))
         # Verificação da existência de diretório do diretório
@@ -1982,7 +1989,7 @@ class PSO:
 
         if 'evolucao' in tipos:
             # Desenvolvimento das iterações:
-            for i in xrange(self.itmax):
+            for i in xrange(self.n_historico):
                 fig = figure()
                 ax = fig.add_subplot(111, projection='3d')
                 xs = [i] * self.Num_particulas
@@ -1992,7 +1999,9 @@ class PSO:
                 ax.set_xlabel(u'Iteração')
                 ax.set_ylabel(u'ID_Partícula')
                 ax.set_zlabel(u'Fitness / u.m')
-                xlim((0.0, self.itmax))
+                ax.set_xlim((0.0, self.itmax))
+                ax.set_zlim((self.best_fitness,max(self.historico_fitness)))
+                ax.set_ylim((0,self.Num_particulas))
                 len_it = len(str(i))
                 numeracao = '0' * (len_itmax - len_it) + str(i)
                 fig.savefig(dir1 + 'Evolucao_algoritmo_' + numeracao + '.png')
@@ -2037,16 +2046,16 @@ class PSO:
                             if len(Nome_param) == 0:
                                 ax.set_ylabel(r"$x_{%0.0f}$ " % (p2 + 1), fontsize=20)
                                 ax.set_xlabel(r"$x_{%0.0f}$ " % (p1 + 1), fontsize=20)
+                            elif Unid_param is None:
+                                ax.set_ylabel(Nome_param[p2], fontsize=20)
+                                ax.set_xlabel(Nome_param[p1], fontsize=20)
                             elif isinstance(Unid_param, list):
                                 if len(Unid_param) == 0:
                                     ax.set_ylabel(Nome_param[p2], fontsize=20)
                                     ax.set_xlabel(Nome_param[p1], fontsize=20)
-                            elif Unid_param == None:
-                                ax.set_ylabel(Nome_param[p2], fontsize=20)
-                                ax.set_xlabel(Nome_param[p1], fontsize=20)
-                            else:
-                                ax.set_ylabel(Nome_param[p2] + u'/' + Unid_param[p2], fontsize=20)
-                                ax.set_xlabel(Nome_param[p1] + u'/' + Unid_param[p1], fontsize=20)
+                                else:
+                                    ax.set_ylabel(Nome_param[p2] + u'/' + Unid_param[p2], fontsize=20)
+                                    ax.set_xlabel(Nome_param[p1] + u'/' + Unid_param[p1], fontsize=20)
                         else:
                             ax.set_ylabel(r"$x_{%0.0f}$ " % (p2 + 1), fontsize=20)
                             ax.set_xlabel(r"$x_{%0.0f}$ " % (p1 + 1), fontsize=20)
@@ -2054,12 +2063,11 @@ class PSO:
                         xlim((self.limite_inferior[p1], self.limite_superior[p1]))
                         ylim((self.limite_inferior[p2], self.limite_superior[p2]))
 
-                        fig.savefig(
-                            dir2 + 'Parametros' + '_p' + str(p1 + 1) + '_p' + str(p2 + 1) + '_it' + numeracao + '.png')
+                        fig.savefig(dir2 + 'Parametros' + '_p' + str(p1 + 1) + '_p' + str(p2 + 1) + '_it' + numeracao + '.png')
                         close()
 
                     if 'funcao' in tipos:
-                        hist_posicoes = [];
+                        hist_posicoes = []
                         hist_fitness = []
                         for ID_particula in xrange(self.Num_particulas):
                             hist_posicoes.append(self.historico_posicoes[it][ID_particula])
@@ -2092,16 +2100,16 @@ class PSO:
                             if len(Nome_param) == 0:
                                 ax.set_ylabel(r"$x_{%0.0f}$ " % (p2 + 1), fontsize=20)
                                 ax.set_xlabel(r"$x_{%0.0f}$ " % (p1 + 1), fontsize=20)
+                            elif Unid_param is None:
+                                ax.set_ylabel(Nome_param[p2], fontsize=20)
+                                ax.set_xlabel(Nome_param[p1], fontsize=20)
                             elif isinstance(Unid_param, list):
                                 if len(Unid_param) == 0:
                                     ax.set_ylabel(Nome_param[p2], fontsize=20)
                                     ax.set_xlabel(Nome_param[p1], fontsize=20)
-                            elif Unid_param == None:
-                                ax.set_ylabel(Nome_param[p2], fontsize=20)
-                                ax.set_xlabel(Nome_param[p1], fontsize=20)
-                            else:
-                                ax.set_ylabel(Nome_param[p2] + u'/' + Unid_param[p2], fontsize=20)
-                                ax.set_xlabel(Nome_param[p1] + u'/' + Unid_param[p1], fontsize=20)
+                                else:
+                                    ax.set_ylabel(Nome_param[p2] + u'/' + Unid_param[p2], fontsize=20)
+                                    ax.set_xlabel(Nome_param[p1] + u'/' + Unid_param[p1], fontsize=20)
                         else:
                             ax.set_ylabel(r"$x_{%0.0f}$ " % (p2 + 1), fontsize=20)
                             ax.set_xlabel(r"$x_{%0.0f}$ " % (p1 + 1), fontsize=20)
