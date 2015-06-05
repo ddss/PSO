@@ -1283,7 +1283,7 @@ class PSO:
         ithist = 1       # contador para as listas de histórico histórico
         itdesempenho = 1 # contador para as listas de desemoenho
         it = 1 # contador de iterações
-        it_gbest = 0
+        self.it_gbest = 0
         # Inicialização de variáveis atributos do PSO
         velocidade_ideal = 0
         w = self.w[0]
@@ -1396,19 +1396,21 @@ class PSO:
                 itdesempenho += 1
 
             if it > self.itmin:
+                # Determinando o número de iterações na qual gbest está constante
+                if evolucaogbest == sum([abs(i) for i in gbest]):
+                    self.it_gbest += 1
+
+                evolucaogbest = sum([abs(i) for i in gbest])
 
                 if self.metodo._metodosdisponiveis['parada'][0] not in self.metodo.parada:# itmax
 
-                    if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:# desviorelativo
-                        self.teste_parada_desvio = True if std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17]) <= self.parada_desvio else False
-
                     if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:# evolucaogbest
-                        if evolucaogbest == sum([abs(i) for i in gbest]):
-                            it_gbest += 1
 
-                        evolucaogbest = sum([abs(i) for i in gbest])
+                        self.teste_parada_gbest = True if self.it_gbest > self.parada_gbest else False
 
-                        self.teste_parada_gbest = True if it_gbest > self.parada_gbest else False
+                    if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:# desviorelativo
+
+                        self.teste_parada_desvio = True if std(vetor_fitness, ddof=1)/max([best_fitness, 1e-17]) <= self.parada_desvio else False
 
                     self.it_break = self.teste_parada_desvio and self.teste_parada_gbest
 
@@ -1580,20 +1582,37 @@ class PSO:
                                                                                           self.metodo.gbest))
 
                 outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\n')
-                outfile.write(('{:-^100}\n').format('INICIALIZAÇÃO DO ALGORITMO'))
-                outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
-                outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
 
                 outfile.write(('{:-^100}\n').format('RESTRIÇÕES'))
                 outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
                 outfile.write('Superior  : {}\n'.format(self.limite_superior))
                 outfile.write('Inferior  : {}\n'.format(self.limite_inferior))
 
+                outfile.write(('{:-^100}\n').format('PARADA'))
+                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\n')
+                outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\n')
+
+                if not self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada:
+                    outfile.write('Configurações:\n')
+                if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:
+                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\n'.format(self.parada_desvio))
+                if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:
+                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\n'.format(self.parada_gbest))
+
+                outfile.write('\n')
+                outfile.write(('{:-^100}\n').format('INICIALIZAÇÃO DO ALGORITMO'))
+                outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
+                outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
+
                 outfile.write(('{:-^100}\n').format('SELEÇÃO DOS PARÂMETROS'))
                 outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
                 outfile.write('Peso de inércia e fatores de aceleração:\n')
-                outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[0], self.C1[0], self.C2[0]))
-                outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
+                if self.metodo.inercia is not None:
+                    outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[0], self.C1[0], self.C2[0]))
+                    outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
+                else:
+                    outfile.write('    INÍCIO - w: None | c1: {:.1f} | c2: {:.1f}\n'.format(self.C1[0], self.C2[0]))
+                    outfile.write('    FIM    - w: None | c1: {:.1f} | c2: {:.1f}\n'.format(self.C1[1], self.C2[1]))
                 outfile.write('Vmax   : {}\n'.format(self.Vmax))
                 outfile.write('Vreinit: {}\n'.format(self.Vreinit))
                 outfile.write('deltaw : {}\n'.format(self.deltaw))
@@ -1602,28 +1621,25 @@ class PSO:
                 outfile.write('Iterações: {} (sendo 1 de inicialização)\n'.format(self.itmax))
                 outfile.write('Número mínimo de iterações realizadas : {}\n'.format(self.itmin))
 
-                outfile.write(('{:-^100}\n').format('PARADA'))
-                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\n')
-                outfile.write('Status             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\n')
-                # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
-                testes_parada = [str(not self.it_break), str(self.teste_parada_desvio and self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada), str(self.teste_parada_gbest and self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada)]
-                outfile.write('Critério atendido  : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*testes_parada)+'\n')
-                if self.it_break:
-                    outfile.write('Aviso              : O(s) critério(s) de convergência foi/foram atingido(s).\n')
-                else:
-                    outfile.write('Aviso              : número máximo de iterações atingido.\n')
-                if not self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada:
-                    outfile.write('Configurações:\n')
-                if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:
-                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\n'.format(self.parada_gbest))
-                if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:
-                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\n'.format(self.parada_desvio))
-
                 outfile.write(('{:-^100}\n').format('RESULTADOS'))
                 outfile.write('Ótimo  : {} \n'.format(self.gbest))
                 outfile.write('Fitness: {} \n'.format(self.best_fitness))
-                outfile.write('Desvio relativo das partículas ao final: {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
-                outfile.write('Média das partículas ao final          : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+                outfile.write('Informações sobre parada:\n')
+                outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+'\n')
+                # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
+                testes_parada = {self.metodo._metodosdisponiveis['parada'][0]:str(not self.it_break),
+                                 self.metodo._metodosdisponiveis['parada'][1]:str(self.teste_parada_desvio and self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada),
+                                 self.metodo._metodosdisponiveis['parada'][2]:str(self.teste_parada_gbest and self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada)}
+                construtor = [' {'+parada+':^15}|' for parada in self.metodo.parada]
+                outfile.write('Atendido?       : '+''.join(construtor).format(**testes_parada)+'\n')
+                if self.it_break:
+                    outfile.write('Aviso           : O(s) critério(s) de convergência foi/foram atingido(s).\n')
+                else:
+                    outfile.write('Aviso           : número máximo de iterações atingido.\n')
+                outfile.write('Status: \n')
+                outfile.write('    Número de iterações em que gbest está constante: {}\n'.format(self.it_gbest))
+                outfile.write('    Desvio relativo das partículas ao final        : {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
+                outfile.write('    Média das partículas ao final                  : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
 
                 outfile.write(('{:-^100}\n').format('HISTÓRICOS'))
                 outfile.write('HISTÓRICO DE DESEMPENHO:\n')
@@ -1650,12 +1666,12 @@ class PSO:
         Saídas
         ======
         Gráficos:
-        - Baseados no histórico: (O tamanho do histórico afeta estes gráficos)
+        - Baseados no histórico da posição e fitness: (O tamanho do histórico afeta estes gráficos)
         * Funcao objetivo em três dimensões:
         * Função objetivo em 1 dimensão
         * Histograma dos parâmetros
 
-        - Baseados no Desempenho:
+        - Baseados no histórico de desempenho:
         * Media e desvio padrão do fitness das partículas
         * fator de inércia
         * velocidade
@@ -1776,7 +1792,7 @@ class PSO:
         fig = figure()
         ax = fig.add_subplot(1, 1, 1)
         plot(self.index_desempenho, self.media_velocidade, 'b-')
-        if self.metodo.inercia == 'TVIW-Adaptative-VI':
+        if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]:
             plot(self.index_desempenho, self.velocidade_ideal, 'r-')
         ax.yaxis.grid(color='gray', linestyle='dashed')
         ax.xaxis.grid(color='gray', linestyle='dashed')
@@ -1787,7 +1803,7 @@ class PSO:
         fig.savefig(base_path + 'Medias_velocidade_global.png')
         close()
 
-        if (self.metodo.inercia == 'TVIW-linear') or (self.metodo.inercia == 'TVIW-random') or (self.metodo.inercia == 'TVIW-Adaptative-VI'):
+        if self.metodo.inercia is not None:
             # Gráfico de histório do inertia weight
             fig = figure()
             ax3 = fig.add_subplot(1, 1, 1)
@@ -1994,7 +2010,12 @@ class PSO:
                 ax.set_ylabel(u'ID_Partícula')
                 ax.set_zlabel(u'Fitness / u.m')
                 ax.set_xlim((0.0, self.index_historico[-1]))
-                ax.set_zlim((self.best_fitness,max(self.historico_fitness)))
+
+                if i < self.n_historico/2:
+                    ax.set_zlim((self.best_fitness,max(self.historico_fitness)))
+                else:
+                    ax.set_zlim((self.best_fitness,max(self.historico_fitness[int(self.n_historico/2):-1])))
+
                 ax.set_ylim((0,self.Num_particulas))
                 len_it = len(str(i))
                 numeracao = '0' * (len_itmax - len_it) + str(i)
