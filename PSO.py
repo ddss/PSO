@@ -113,7 +113,7 @@ class Particula(Thread):
         Thfitness.start()
         Thfitness.join()
 
-        self.fitness = Thfitness.result
+        self.fitness = float(Thfitness.result)
 
     def Execucao_PSO(self):
         # Método para cálculo do particle swarm optimization (PSO) e suas variações
