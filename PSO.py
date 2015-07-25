@@ -2032,7 +2032,7 @@ class PSO:
 
             Combinacoes = int(factorial(self.Num_parametros) / (factorial(self.Num_parametros - 2) * factorial(2)))
 
-            for it in xrange(self.itmax):
+            for it in xrange(self.n_historico):
                 p1 = 0
                 p2 = 1
                 cont = 0
