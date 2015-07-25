@@ -656,14 +656,15 @@ class PSO:
         ========
         Keywargs
         ========    
-        
-        Outros argumentos opcionais estão disponíveis. Estes argumentos definem valores dos parâmetros do algoritmo a ser executado, em metodo. Por serem opcionais, caso não sejam definidos assumem valores *default*. Por serem **argumentos chave** devem ser expressamente definidos pelo nome.
-        
+        Argumentos opcionais:
+        Por serem opcionais, caso não sejam definidos assumem valores *default*.
+
         **Keywargs com valores default None** (Caso não definidas, são ignoradas pelo algoritmo)        
         
         * ``posinit_sup`` (lista de mesmo comprimento de ``limite_superior``): valores de **limite superior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_superior 
         * ``posinit_inf`` (lista de mesmo comprimento de ``limite_inferior``): valores de **limite inferior** de busca para inicializar o algoritmo em um intervalo diferente daquele definido pelo limite_inferior 
         * ``otimo`` (lista): ponto focal quando o método busca utilizado é ``Regiao``. Deve ser uma lista com a mesma dimensão das dimensões de busca
+        * ``NP``(float): número de parâmetros envolvidos na otimização. Usado para validação de sup e inf.
 
         **keywargs cujos valores default dependem do método** (Caso não definidas, seus valores serão determinados pelo algoritmo) - vide seção valores default abaixo
 
@@ -763,16 +764,16 @@ class PSO:
         # VALIDAÇÕES DE ENTRADAS
         # Os limites inferior e superior devem ser listas
         if not isinstance(limite_inferior, list) or not isinstance(limite_superior, list):
-            raise TypeError('Os limites inferiores e superiores devem ser listas.')
+            raise TypeError('Os limites inferiores e superiores de busca devem ser listas.')
 
         # Os limites inferior e superior devem ter a mesma dimensão
         if len(limite_inferior) != len(limite_superior):
-            raise NameError('Os limites_superior e limite_inferior devem ter a mesma dimensão')
+            raise ValueError('Os limites_superior e limite_inferior de busca devem ter a mesma dimensão')
 
         # VALIDAÇÕES DE KEYWORDS:
         # keywords disponíveis com seus respectivos tipos
         # args_model não é validado, pois depende da função sendo minimizada.
-        keydisponiveis = {'posinit_sup':list, 'posinit_inf':list,
+        keydisponiveis = {'NP':int,'posinit_sup':list, 'posinit_inf':list,
                           'w':list, 'C1':list, 'C2':list,
                           'Vmax':list, 'Vreinit':list,
                           'otimo':list, 'deltaw':float,'args_model':None,
@@ -787,7 +788,12 @@ class PSO:
             # validação de o tipo está correto
             if kwargs.get(key) is not None and keydisponiveis[key] is not None:
                 if not isinstance(kwargs.get(key),keydisponiveis[key]):
-                    raise TypeError('A chave {} deve ter como conteúdo {}'.format(key,keydisponiveis[key]))
+                    raise TypeError('A chave {} deve ter como conteúdo {}.'.format(key,keydisponiveis[key]))
+
+        # O limite superior e inferior devem ter a mesma dimensão que NP
+        if kwargs.get('NP') is not None:
+            if len(limite_superior) != kwargs.get('NP'):
+                raise ValueError('Os limites inferior e superior de busca devem ter a mesma dimensão que o número de parâmetros informado.')
 
         # O limite de inicialização, caso definido, deve ser uma lista e ter meesma dimensão
         # do limite_inferior e limite_superior
@@ -806,12 +812,12 @@ class PSO:
         # teste para avaliar se o limite superior é menor do que  o inferior.
         for i in xrange(len(limite_superior)):
             if limite_inferior[i] >= limite_superior[i]:
-                raise ValueError('O limite inferior deve ser menor do que o limite superior para todas as dimensões')
+                raise ValueError('O limite inferior de busca deve ser menor do que o limite superior de busca para todas as dimensões')
 
         # teste para avaliar se o ponto focal tem mesmo tamanho do número de parâmetros
         if kwargs.get('otimo') is not None:
             if len(kwargs.get('otimo')) != len(limite_superior):
-                raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior.')
+                raise ValueError('O ponto ótimo deve ter a mesma dimensão do limite_superior e limite_inferior de busca.')
 
         # validação de itmin
         if kwargs.get('itmin') is not None:
