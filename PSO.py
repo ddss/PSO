@@ -109,9 +109,13 @@ class Particula(Thread):
 
     def Fitness_Particula(self):
         # Cálculo do Fitness da partícula
+        global Controle_modelo
+
+        Controle_modelo.acquire()
         Thfitness = self.FO(self.posicao, self.args_model)
         Thfitness.start()
         Thfitness.join()
+        Controle_modelo.release()
 
         self.fitness = float(Thfitness.result)
 
@@ -1163,7 +1167,7 @@ class PSO:
         # VARIÁVEIS GLOBAIS - Compartilhada com Partícula
         # ------------------------------------------------------------------------------
         #  Controle de threads
-        global Controle_FO, Controle_Particula, Controle_Iteracao, Controle_variaveis, total_particulas_atendidas, Controle_Total_Threads
+        global Controle_FO, Controle_Particula, Controle_Iteracao, Controle_variaveis, total_particulas_atendidas, Controle_Total_Threads, Controle_modelo
         # variáveis compartilhadas
         global vetor_posicoes, vetor_fitness, vetor_velocidades, vetor_pbest, best_fitness, gbest
 
@@ -1188,7 +1192,7 @@ class PSO:
         Controle_Iteracao = Lock()       # Aplicável para evitar que a iteração acabe prematuramente, devido ao não término da execução de Threads
         Controle_variaveis = Lock()      # Aplicável para controlar a região crítica envolvendo as variáveis característica das partículas (posicão, velocidade, fitness e gbest)
         Controle_Total_Threads = Lock()  # Aplicável para controlar a região crítica envolvendo a variável total_particulas_atendidas
-
+        Controle_modelo      = Lock()    # Aplicável para controlar acesso ao modelo
         # ------------------------------------------------------------------------------
         # INICIALIAÇÃO DE VARIÁVEIS PARA SALVAR AS INFORMAÇÕES DAS PARTÍCULAS
         # ------------------------------------------------------------------------------
