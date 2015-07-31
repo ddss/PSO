@@ -40,8 +40,8 @@ from threading import Thread, Lock, BoundedSemaphore
 from numpy import random, min, argmin, copy, matrix, multiply, random, size, min, \
     max, copysign, ones, mean, std, sqrt, cos, pi, sort, argsort, savetxt
 from scipy.misc import factorial
-from math import isnan, ceil
-
+from math import isnan, ceil, floor
+from fractions import gcd
 # Importação de pacotes para gráficos
 from matplotlib import cm, ticker
 
@@ -876,21 +876,22 @@ class PSO:
         self.posinit_sup = kwargs.get('posinit_sup') if kwargs.get('posinit_sup') is not None else limite_superior
         # posições de inicialização do algoritmo - limite inferior:
         self.posinit_inf = kwargs.get('posinit_inf') if kwargs.get('posinit_inf') is not None else limite_inferior
-         # Parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]:
-        self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
-        # Argumentos extras a serem enviados para o modelo:
-        self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
-        # tamanho do histórico
-        self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else min([1000, itmax])
-        # identificação
-        self.init_historico = kwargs.get('init_historico') if kwargs.get('init_historico') is not None else 0
-        # identificação do desempenho
-        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else min([int(ceil(0.1*itmax)),itmax])
-        # Número mínimo de iterações, caso não definido será 50% das iterações
+        # Número mínimo de iterações. Default:  1/3 de itmax
         self.itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else int(ceil(itmax/3))
-        # Critério de parada para gbest: número de iterações que o ponto ótimo não muda
+        # parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]:
+        self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
+        # argumentos extras a serem enviados para o modelo:
+        self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
+        # posicao a qual inicia o armazenamento do histórico
+        self.init_historico = kwargs.get('init_historico') if kwargs.get('init_historico') is not None else 0
+        # tamanho do histórico. Deve ser divisor de itmax - init_historico. Default: maior divisor comum entre 1000 e a
+        # diferença entre itmax-init_historico
+        self.n_historico = kwargs.get('n_historico') if kwargs.get('n_historico') is not None else int(gcd(1000,itmax-self.init_historico))
+        # tamanho do histórico de desempenho. Deve ser divisor do número máximo de iterações
+        self.n_desempenho = kwargs.get('n_desempenho') if kwargs.get('n_desempenho') is not None else int(gcd(1000,itmax))
+        # Critério de parada para gbest: número de iterações que o ponto ótimo não muda. Default: 10% de itmax
         self.parada_gbest = kwargs.get('parada_gbest') if kwargs.get('parada_gbest') is not None else int(0.1*itmax)
-        # Critério de parada de desvio: qual o valor do desvio relativo para o qual o algoritmo deve parar
+        # Critério de parada de desvio: qual o valor do desvio relativo das partículas para o qual o algoritmo deve parar. Default: 0
         self.parada_desvio = kwargs.get('parada_desvio') if kwargs.get('parada_desvio') is not None else 0.
         # -------------------------------------------------------------------------------
         # VALIDAÇÕES ADICIONAIS
@@ -930,7 +931,7 @@ class PSO:
         # INICIALIZAÇÃO DAS LISTAS DE HISTÓRICO
         # -------------------------------------------------------------------------------
         # lista com os índices das iterações nas quais o desempenho será avaliado
-        self.index_desempenho = range(0,self.itmax,int(itmax/self.n_desempenho))
+        self.index_desempenho = range(0,self.itmax,int(ceil(itmax/self.n_desempenho)))
         # lista com os índices das iterações nas quais o histórico de posições e velocidades serão salvos
         self.index_historico = range(self.init_historico,self.itmax,int((itmax-self.init_historico)/self.n_historico))
 
@@ -1838,15 +1839,18 @@ class PSO:
                 hist_fitness.append(self.historico_fitness[it][ID_particula])
 
         # Histograma das posições
-        for D in xrange(self.Num_parametros):
-            aux = [hist_posicoes[it][D] for it in xrange(self.n_historico)]  # obtenção das posições para a dimensão D
+        if self.n_historico > 10:
+            for D in xrange(self.Num_parametros):
 
-            fig = figure()
-            ax = fig.add_subplot(1, 1, 1)
-            hist(aux, normed=True, histtype='stepfilled', color='b')
-            ylabel(u'Frequência normalizada')
-            xlabel(u'Valores dos parâmetros')
-            fig.savefig(base_path + 'Histograma_parametros_%d' % (D + 1) + '.png')
+                    aux = [hist_posicoes[it][D] for it in xrange(self.n_historico)]  # obtenção das posições para a dimensão D
+                    fig = figure()
+                    ax = fig.add_subplot(1, 1, 1)
+                    hist(aux, normed=True, histtype='stepfilled', color='b')
+                    ylabel(u'Frequência normalizada')
+                    xlabel(u'Valores dos parâmetros')
+                    fig.savefig(base_path + 'Histograma_parametros_%d' % (D + 1) + '.png')
+        else:
+            warn('O histograma dos parâmetros não foi criado, pois n_historico tem tamanho menor do que 10.',UserWarning)
 
         # Gráfico da função objetivo----------------------------------------------
         for ix in xrange(self.Num_parametros):
