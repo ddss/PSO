@@ -994,11 +994,11 @@ class PSO:
                 self.w = [None]*2
         else:
             if self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][0] or self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][3]:
+
                 if len(w) == 2:
                     self.w = w
                 else:
                     raise ValueError('w deve ser uma lista de 2 valores, visto que o método para w é {}'.format(self.metodo.inercia))
-
             elif self.metodo.inercia == self.metodo._metodosdisponiveis['inercia'][1]: # TVIW-random
                 if w is None:
                     self.w = [None]*2  # Valor não será necessário. W é aleatório
@@ -1083,7 +1083,7 @@ class PSO:
         # ------------------------------------------------------------------------------
         if Vmax is None:
             # Conforme [4], Vmax é mantido no limite dinâmico do problema
-            self.Vmax = [max([abs(self.limite_inferior[i]), abs(self.limite_superior[i])]) for i in xrange(self.Num_parametros)]
+            self.Vmax = [abs(self.limite_superior[i] - self.limite_inferior[i]) for i in xrange(self.Num_parametros)]
         else:
             if len(Vmax) == self.Num_parametros:
                 self.Vmax = Vmax
@@ -1511,10 +1511,8 @@ class PSO:
              >>> Otimizacao = PSO(sup,inf) # Criação da classe PSO
              >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
              >>> base_path = os.getcwd() + '/Exemplo'
-             >>> Otimizacao.Result_txt(base_path+'/Resultado/')   # Salvar os principais resultados em arquivos de texto
-             >>> Otimizacao.Graficos(base_path+'/Graficos/')     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO            
-             
-             
+             >>> Otimizacao.Relatorios(base_path+'/Resultado/')   # Salvar os principais resultados em arquivos de texto
+
         ==========================
         Possíveis Arquivos gerados
         ==========================
@@ -1528,17 +1526,33 @@ class PSO:
         * **index_historico**: contém os pontos para os quais o histórico das posições e fitness foram gerados
         * **index_desempenho**: contém os pontos para os quais o histórico para os indicadores de desempenho
 
-        ================
-        Arquivos gerados
-        ================
+        ==================
+        Keywords arguments
+        ==================
+        - controle de arquivos que serão gerados:
         * ``resumos_txt`` (bool): cria os arquivos best_fitness.txt, gbest.txt, historico_posicoes.txt, historico_fitness.txt,
         index_historico.txt, index_desempenho.txt
-        * ``relatorio`` (bool): cria o arquivo Resumo.txt
+        * ``relatorio`` (bool): cria o arquivo contendo as principais informações sobre a otimização (nome default Resumo.txt)
 
+        - titulo do arquivo de resumo:
+        * ``titulo_relatorio`` (string): string para substituir o nome do arquivo de resumo da otimização
         '''
+        # ----------------------------------------------------------------------------------------
+        # VALIDAÇÃO
+        # ----------------------------------------------------------------------------------------
+        tiposkwargs = {'resumos_txt':bool,'relatorio':bool,'titulo_relatorio':str}
 
+        for key in tiposkwargs.keys():
+            if kwargs.get(key) is not None:
+                if not isinstance(kwargs.get(key),tiposkwargs[key]):
+                    raise TypeError('A keyword {} aceita {} como entrada, e não {}'.format(key,tiposkwargs[key],type(kwargs.get(key))))
+
+        # ----------------------------------------------------------------------------------------
+        # VALORES DEFAULT
+        # ----------------------------------------------------------------------------------------
         resumos_txt = False if kwargs.get('resumos_txt') is None else kwargs.get('resumos_txt')
         relatorio   = True if kwargs.get('relatorio') is None else kwargs.get('relatorio')
+        titulo_relatorio = 'Resumo-otimizacao.txt' if kwargs.get('titulo_relatorio') is None else kwargs.get('titulo_relatorio')
 
         if base_path == None:
             base_path = os.getcwd() + "/PSO/Relatorios/"
@@ -1580,8 +1594,8 @@ class PSO:
             savetxt(base_path + 'Best_fitness.txt', matrix(self.best_fitness), fmt='%.18f')
 
         if relatorio:
-            # Resumo da estimação
-            with open(base_path + 'Resumo.txt', 'wb') as outfile:
+            # Resumo da otimização
+            with open(base_path + titulo_relatorio, 'wb') as outfile:
                 outfile.write(('{:#^100}\n').format('RESUMO DO PSO'))
                 outfile.write(('{:-^100}\n').format('MÉTODO'))
                 outfile.write('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} \n'.format(self.metodo.algoritmo,
@@ -1594,12 +1608,12 @@ class PSO:
 
                 outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\n')
 
-                outfile.write(('{:-^100}\n').format('RESTRIÇÕES'))
+                outfile.write(('\n{:-^100}\n\n').format('RESTRIÇÕES'))
                 outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
                 outfile.write('Superior  : {}\n'.format(self.limite_superior))
                 outfile.write('Inferior  : {}\n'.format(self.limite_inferior))
 
-                outfile.write(('{:-^100}\n').format('PARADA'))
+                outfile.write(('\n{:-^100}\n\n').format('PARADA'))
                 outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\n')
                 outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\n')
 
@@ -1611,11 +1625,11 @@ class PSO:
                     outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\n'.format(self.parada_gbest))
 
                 outfile.write('\n')
-                outfile.write(('{:-^100}\n').format('INICIALIZAÇÃO DO ALGORITMO'))
+                outfile.write(('\n{:-^100}\n\n').format('INICIALIZAÇÃO DO ALGORITMO'))
                 outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
                 outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
 
-                outfile.write(('{:-^100}\n').format('SELEÇÃO DOS PARÂMETROS'))
+                outfile.write(('\n{:-^100}\n\n').format('SELEÇÃO DOS PARÂMETROS'))
                 outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
                 outfile.write('Peso de inércia e fatores de aceleração:\n')
                 if self.metodo.inercia is not None:
@@ -1628,13 +1642,13 @@ class PSO:
                 outfile.write('Vreinit: {}\n'.format(self.Vreinit))
                 outfile.write('deltaw : {}\n'.format(self.deltaw))
 
-                outfile.write(('{:-^100}\n').format('ITERAÇÕES'))
+                outfile.write(('\n{:-^100}\n\n').format('ITERAÇÕES'))
                 outfile.write('Iterações: {} (sendo 1 de inicialização)\n'.format(self.itmax))
                 outfile.write('Número mínimo de iterações realizadas : {}\n'.format(self.itmin))
 
-                outfile.write(('{:-^100}\n').format('RESULTADOS'))
-                outfile.write('Ótimo  : {} \n'.format(self.gbest))
-                outfile.write('Fitness: {} \n'.format(self.best_fitness))
+                outfile.write(('\n{:-^100}\n\n').format('RESULTADOS'))
+                outfile.write('Ponto ótimo                       : {} \n'.format(self.gbest))
+                outfile.write('Fitness (valor da função objetivo): {} \n'.format(self.best_fitness))
                 outfile.write('Informações sobre parada:\n')
                 outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+'\n')
                 # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
@@ -1648,11 +1662,11 @@ class PSO:
                 else:
                     outfile.write('Aviso           : número máximo de iterações atingido.\n')
                 outfile.write('Status: \n')
-                outfile.write('    Número de iterações em que gbest está constante: {}\n'.format(self.it_gbest))
-                outfile.write('    Desvio relativo das partículas ao final        : {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
-                outfile.write('    Média das partículas ao final                  : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+                outfile.write('    Número de iterações em que gbest ficou constante                 : {}\n'.format(self.it_gbest))
+                outfile.write('    Desvio relativo das partículas ao final das iterações            : {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
+                outfile.write('    Média do fitness (valor função objetivo) das partículas ao final : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
 
-                outfile.write(('{:-^100}\n').format('HISTÓRICOS'))
+                outfile.write(('\n{:-^100}\n\n').format('HISTÓRICOS'))
                 outfile.write('HISTÓRICO DE DESEMPENHO:\n')
                 outfile.write('    Tamanho do histórico de desempenho: {}\n'.format(self.n_desempenho))
                 outfile.write('\n')
