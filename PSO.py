@@ -12,7 +12,7 @@ Fatores de inércia suportados (Inertia weight supported):
 - Constante           
 - TVIW-linear         - time variating inertia weight (linear)
 - TVIW-random         - time variating inertia weight (random)
-- TVIW-Adaptative-VI  - time variating inertia weight with adaptive parameter tuning of particle swarm optimization based on velocity information 
+- TVIW-Adaptive-vel  - time variating inertia weight with adaptive parameter tuning of particle swarm optimization based on velocity information
 
 Fatores de aceleração suportados (Acceleration factors supported):
 - Constante
@@ -33,22 +33,19 @@ sys.setdefaultencoding("utf-8") # Forçar o sistema utilizar o coding utf-8
 
 # Importação de pacotes para cálculos
 import os
-from time import sleep, ctime, time
 import sys
 from threading import Thread, Lock, BoundedSemaphore
 
-from numpy import random, min, argmin, copy, matrix, multiply, random, size, min, \
-    max, copysign, ones, mean, std, sqrt, cos, pi, sort, argsort, savetxt
+from numpy import argmin, copy, matrix, random, size, min, \
+    max, copysign, mean, std, cos, pi, sort, argsort, savetxt
 from scipy.misc import factorial
-from math import isnan, ceil, floor
+from math import isnan, ceil
 from fractions import gcd
 # Importação de pacotes para gráficos
 from matplotlib import cm, ticker
 
-from matplotlib.pyplot import figure, axes, plot, subplot, xlabel, ylabel, \
-    title, legend, savefig, xlim, ylim, close, gca, hist
-from mpl_toolkits.mplot3d import Axes3D, proj3d
-from matplotlib.patches import Ellipse, FancyArrowPatch
+from matplotlib.pyplot import figure, plot, xlabel, ylabel, \
+     legend, xlim, ylim, close, hist
 
 from warnings import warn
 
@@ -278,7 +275,7 @@ class Metodo:
         
         * ``algoritmo``: ``PSO`` ou ``HPSO``
             
-        * ``inercia``: ``Constante`` ou ``TVIW-linear`` ou ``TVIW-Adaptative-VI`` ou ``TVIW-random``
+        * ``inercia``: ``Constante`` ou ``TVIW-linear`` ou ``TVIW-Adaptive-VI`` ou ``TVIW-random``
         
         * ``aceleracao``: ``Constante`` ou ``TVAC``
 
@@ -298,30 +295,29 @@ class Metodo:
 
         * ``busca``: define o método de busca. Conteúdos disponíveis são: ``Otimo`` ou ``Regiao``
 
-        **Chaves não obrigatórias** 
+        **Chaves opcionais**
         
-        * ``algoritmo``: define o algoritmo a ser utilizado. Se ``busca`` for ``Regiao``, então é definido ``HPSO``. Caso contrário ``PSO``
+        * ``algoritmo``: define o algoritmo a ser utilizado. Default: se ``busca`` for ``Regiao``, então é definido ``HPSO``. Caso contrário ``PSO``
             
-        * ``inercia``: define o método do peso de inércia. Se ``algoritmo`` é ``PSO`` e ``busca`` è ``Regiao``, então, o método de inérci é ``TVIW-linear``. Caso contrário, ``Constante``
+        * ``inercia``: define o método do peso de inércia. Default: se ``algoritmo`` é ``PSO`` é utilizado '`TVIW-linear`` para busca do ponto ótimo, caso contrário ``Constante``
         
-        * ``aceleracao``: define o método para fatores de aceleração. Se ``algoritmo`` é ``PSO``, ``aceleração`` é ``Constante``. Caso ``algoritmo`` seja ``HPSO`` e ``busca`` seja ``Otimo``, então ``TVAC``. Se ``busca`` for ``Regiao``, então ``Constante``.
+        * ``aceleracao``: define o método para fatores de aceleração. Default: Se ``algoritmo`` é ``PSO``, ``aceleração`` é ``Constante``. Caso ``algoritmo`` seja ``HPSO`` e ``busca`` seja ``Otimo``, então ``TVAC``. Se ``busca`` for ``Regiao``, então ``Constante``.
 
-        * ``Vreinit``: método para definir o comportamento da reinicialização do HPSO. Caso não definido é utilizado o ``TVVr-linear``
+        * ``Vreinit``: método para definir o comportamento da reinicialização do HPSO. Default: ``TVVr-linear``
         
-        * ``restricao``: define se os limites serão utilizados como restrições. Caso não definido é assumido o valor lógico ``True``
+        * ``restricao``: define se os limites serão utilizados como restrições. Default: ``True``
         
-        * ``gbest``: define como a atualização de ``gbest`` (ponto ótimo) é realizada. Se o método de busca é ``Otimo``, então ``Particula`` . Caso o método de busca seja ``Regiao``, então ``Enxame``.
+        * ``gbest``: define como a atualização de ``gbest`` (ponto ótimo) é realizada. Default: se o método de busca é ``Otimo``, então ``Particula`` . Caso o método de busca seja ``Regiao``, então ``Enxame``.
 
-        * ``parada``: define como o algoritmo de PSO deve finalizar sua execução. Se o algoritmo for PSO, então ['evolucaogbest','desviorelativo'], caso contrário, HPSO, então ['evolucaogbest']
+        * ``parada``: define como o algoritmo de PSO deve finalizar sua execução. Default: se o algoritmo for PSO, então ['evolucaogbest','desviorelativo'], caso contrário, HPSO, então ['evolucaogbest']
         '''
         # -------------------------------------------------------------------------------
         # VALIDAÇÃO
         # -------------------------------------------------------------------------------
         # Métodos disponíveis:
-        # TODO: modificar nome do método 'TVIW-Adaptative-VI' para TVIW-Adaptive-vel
         self._metodosdisponiveis = {'busca':       ['Otimo', 'Regiao'],
                                      'algoritmo':  ['PSO', 'HPSO'],
-                                     'inercia':    ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptative-VI'],
+                                     'inercia':    ['TVIW-linear', 'TVIW-random', 'Constante', 'TVIW-Adaptive-vel'],
                                      'aceleracao': ['TVAC', 'Constante'],
                                      'Vreinit':    ['TVVr-linear', 'Constante'],
                                      'restricao':  [True,False],
@@ -532,7 +528,7 @@ class PSO:
             >>> inf  = [-10.] # limite inferir de busca para x
             >>> Otimizacao = PSO(sup,inf) # Criação da classe PSO
             >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
-            >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
+            >>> Otimizacao.Relatorios()   # Salvar os principais resultados em arquivos de texto
             >>> Otimizacao.Graficos()     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
 
         ==========
@@ -548,7 +544,7 @@ class PSO:
         * ``.historico_posicoes``: histórico dos valores dos parâmetros a cada iteração, para cada partícula
         * ``.historico_fitness``: histórico dos valores da função objetivo a cada iteração, para cada partícula
 
-        Para mais detalhes sobre os métodos ``.Busca()``, ``.Graficos()`` e ``.Result_txt()`` consulte a documentação dos mesmos.        
+        Para mais detalhes sobre os métodos ``.Busca()``, ``.Graficos()`` e ``.Relatorios()`` consulte a documentação dos mesmos.
         
         =====================================
         USO do algoritmo (Entradas opcionais)
@@ -572,7 +568,7 @@ class PSO:
             
                 * ``Constante`` (conteúdo, string): o peso de inércia é assumido constante e não varia ao longo das iterações (Vide [1] e [4])
                 * ``TVIW-linear`` (*linear time varying inertia weight*) (conteúdo, string): o peso de inércia varia linearmente ao longo das iterações (VIde [4])
-                * ``TVIW-Adaptative-VI`` (*adaptive time varying inertia weight based on velocity*) (conteúdo, string): o peso de inércia e ajustado no algoritmo para forçar o perfil de velocidade a um comportamento ideal (Vide [8])
+                * ``TVIW-Adaptive-vel`` (*adaptive time varying inertia weight based on velocity*) (conteúdo, string): o peso de inércia e ajustado no algoritmo para forçar o perfil de velocidade a um comportamento ideal (Vide [8])
                 * ``TVIW-random`` (*random time varying inertia weight*) (conteúdo, string): o peso de inércia é variado aleatoriamente entre 0 e 1 (Vide [4])
             
             * ``aceleracao`` (chave):  define como o algoritmo calcula as constantes de aceleração
@@ -605,7 +601,7 @@ class PSO:
         
         Caso o método seja omitido, na chamada da função PSO, conforme Exemplo 1, será utilizado o método: ::
         
-        {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'Constante','restricao':True,'gbest':'Particula','parada':'itmax'}
+        {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'Constante','restricao':True,'gbest':'Particula','parada':['desviorelativo','volucaogbest']}
         
         **Sugestões e recomendações de métodos**:
         
@@ -627,7 +623,7 @@ class PSO:
         
             * PSO com peso de inércia adaptativo e fatores de aceleração constantes [8]: ::
         
-                metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-Adaptative-VI','aceleracao':'Constante','gbest':'Particula'}
+                metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-Adaptive-vel','aceleracao':'Constante','gbest':'Particula'}
                 
             * HPSO com fatores de aceleração constantes e velocidade de reinicialização constante [10]: ::
 
@@ -654,7 +650,7 @@ class PSO:
                 >>> metodo = {'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-linear','aceleracao':'TVAC','restricao':False,'gbest':'Particula'}
                 >>> Otimizacao = PSO(sup,inf,metodo,35,1000) # Criação da classe PSO
                 >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
-                >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
+                >>> Otimizacao.Relatorios()   # Salvar os principais resultados em arquivos de texto
                 >>> Otimizacao.Graficos()     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
 
         ========
@@ -680,7 +676,7 @@ class PSO:
         
         **keywargs com valores default fixos**  (Caso não definidas, seus valores serão determinados pelo algoritmo)
         * RELACIONADAS AO TVIW-Adaptive-vel:
-        * ``deltaw``: parâmetro para de seleção para o cálculo de w, quando o método do peso de inércia é ``TVIW-Adaptative-VI``. Seu valor default é 0.1. Vide [8] para mais detalhes.
+        * ``deltaw``: parâmetro para de seleção para o cálculo de w, quando o método do peso de inércia é ``TVIW-Adaptive-vel``. Seu valor default é 0.1. Vide [8] para mais detalhes.
 
         * RELACIONADAS AO HISTÓRICO DAS POSIÇÕES E VELOCIDADES:
         * ``n_historico`` (float): tamanho máximo do histório das iterações a ser salvo pelo algoritmo (+ inicialização) (limita a quantidade de informações que são salvas). Default: min(itmax,500). O histórico salvara aos dados em intervalos regulares.
@@ -712,7 +708,7 @@ class PSO:
                 >>> C2 = [0.5,2.5] # valores do fator social de aceleração de aceleração 
                 >>> Otimizacao = PSO(sup,inf,metodo,35,1000,w=w,C1=C1,C2=C2) # Criação da classe PSO
                 >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
-                >>> Otimizacao.Result_txt()   # Salvar os principais resultados em arquivos de texto
+                >>> Otimizacao.Relatorios()   # Salvar os principais resultados em arquivos de texto
                 >>> Otimizacao.Graficos()     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
 
         ================
@@ -732,7 +728,7 @@ class PSO:
         =======
         
         * ``Busca``: executa a busca definida no argumento método
-        * ``Result_txt``: salva arquivos de texto com os principais resultados
+        * ``Relatorios``: salva arquivos de texto com os principais resultados
         * ``Graficos``: cria gráficos dos principais resultados
         * ``Movie``: cria gráficos das posições das partículas a cada iteração (pode levar muito tempo)
 
@@ -741,25 +737,15 @@ class PSO:
         ===========
 
         [1] KENNEDY, J.; EBERHART, R. Particle swarm optimization. Proceedings of ICNN’95 - International Conference on Neural Networks. Anais... [S.l.]: IEEE. , 1995
-
         [2] EBERHART, R.; KENNEDY, J. A new optimizer using particle swarm theory. MHS’95. Proceedings of the Sixth International Symposium on Micro Machine and Human Science. Anais... [S.l.]: IEEE., 1995
-
         [3] SHI, Y.; EBERHART, R. A modified particle swarm optimizer. 1998 IEEE International Conference on Evolutionary. Computation Proceedings. IEEE World Congress on Computational Intelligence (Cat. No.98TH8360). Anais... [S.l.]: IEEE., 1998
-        
         [4] EBERHART, R. C. Particle swarm optimization: developments, applications and resources. Proceedings of the 2001.Congress on Evolutionary Computation (IEEE Cat. No.01TH8546). Anais... [S.l.]: IEEE. , 2001
-        
         [5] CLERC, M. The swarm and the queen: towards a deterministic and adaptive particle swarm optimization.
-        
         [6] CLERC, M.; KENNEDY, J. The particle swarm - explosion, stability, and convergence in a multidimensional complex space. IEEE Transactions on Evolutionary Computation, v. 6, n. 1, p. 58–73, 2002.
-        
         [7] ZHANG, L.; YU, H.; HU, S. Optimal choice of parameters for particle swarm optimization. Journal of Zhejiang University SCIENCE, v. 6A, n. 6, p. 528–534, jun 2005.
-
         [8] XU, G. An adaptive parameter tuning of particle swarm optimization algorithm. Applied Mathematics and Computation, v. 219, n. 9, p. 4560–4569, jan 2013.
-        
-        [9] SCHWAAB, M.; BISCAIA, J. . E. C.; MONTEIRO, J. L.; PINTO, J. C. Nonlinear parameter estimation through particle swarm   optimization. Chemical Engineering Science, v. 63, n. 6, p. 1542–1552, mar 2008. 
-        
+        [9] SCHWAAB, M.; BISCAIA, J. . E. C.; MONTEIRO, J. L.; PINTO, J. C. Nonlinear parameter estimation through particle swarm   optimization. Chemical Engineering Science, v. 63, n. 6, p. 1542–1552, mar 2008.
         [10] RATNAWEERA, A.; HALGAMUGE, S. K.; WATSON, H. C. Self-Organizing Hierarchical Particle Swarm Optimizer With Time-Varying Acceleration Coefficients. IEEE Transactions on Evolutionary Computation, v. 8, n. 3, p. 240–255, jun. 2004.
-                
         [11] EBERHART, R.; SHI, Y. Comparing inertia weights and constriction factors in particle swarm optimization. In: Proceedings of the 2000 Congress on Evolutionary Computation. CEC00 (Cat. No.00TH8512). IEEE, 2000. v. 1, n. 7, p. 84–88.
         """
         # -------------------------------------------------------------------------------
@@ -779,10 +765,10 @@ class PSO:
         # args_model não é validado, pois depende da função sendo minimizada.
         keydisponiveis = {'NP':int,'posinit_sup':list, 'posinit_inf':list,
                           'w':list, 'C1':list, 'C2':list,
-                          'Vmax':list, 'Vreinit':list,
-                          'otimo':list, 'deltaw':float,'args_model':None,
-                          'itmin':int, 'n_historico':int, 'n_desempenho':int,
-                          'init_historico':int, 'itmin':int,
+                          'Vmax':list, 'Vreinit':list, 'otimo':list,
+                          'deltaw':float,'args_model':None,'itmin':int,
+                          'n_historico':int, 'n_desempenho':int,
+                          'init_historico':int,
                           'parada_gbest':int,'parada_desvio':float}
 
         for key in kwargs.keys():
@@ -828,11 +814,14 @@ class PSO:
             if kwargs.get('itmin')>itmax:
                 raise ValueError('O número mínimo de iterações (itmin) deve ser menor do que itmax.')
 
+        if (kwargs.get('n_historico') is None or kwargs.get('n_desempenho') is None) and itmax%2 != 0:
+            raise ValueError('Para número ímpar de iterações, defina n_historico e n_desempenho')
+
         # testes para validar consistência de n_historico
         if kwargs.get('n_historico') is not None:
             # Warning: grande consumo de memória e n_historico for grande
             if kwargs.get('n_historico') >= 3000:
-                warn('Grandes históricos (n_historicos) podem reduzir o desempenho e gerrar consumo excessivo de memória RAM para construção dos gráficos.')
+                warn('Grandes históricos (n_historicos) podem reduzir o desempenho e gerar consumo excessivo de memória RAM para construção dos gráficos.')
             # n_historico não pode ser maior do que o número máximo de iterações
             if kwargs.get('n_historico') > itmax:
                 raise ValueError('O histórico não pode ser maior do que o número máximo de iterações.')
@@ -871,14 +860,14 @@ class PSO:
 
         # -------------------------------------------------------------------------------
         # TRATAMENTO DE KEYWARGS
-        # -------------------------------------------------------------------------------        # Valores default das kwargs (Aquelas que não dependem do método escolhido):
+        # -------------------------------------------------------------------------------
         # posições de inicialização do algoritmo - limite superior:
         self.posinit_sup = kwargs.get('posinit_sup') if kwargs.get('posinit_sup') is not None else limite_superior
         # posições de inicialização do algoritmo - limite inferior:
         self.posinit_inf = kwargs.get('posinit_inf') if kwargs.get('posinit_inf') is not None else limite_inferior
         # Número mínimo de iterações. Default:  1/3 de itmax
         self.itmin = kwargs.get('itmin') if kwargs.get('itmin') is not None else int(ceil(itmax/3))
-        # parâmetro de seleção para o algoritmo PSO-TVIW-Adaptative-VI | Default 0.1, conforme recomendação de [8]:
+        # parâmetro de seleção para o algoritmo PSO-TVIW-Adaptive-vel | Default 0.1, conforme recomendação de [8]:
         self.deltaw = kwargs.get('deltaw') if kwargs.get('deltaw') is not None else 0.1
         # argumentos extras a serem enviados para o modelo:
         self.args_model = kwargs.get('args_model') if kwargs.get('args_model') is not None else []
@@ -958,7 +947,7 @@ class PSO:
         * Se o método para cálculo do peso de inércia é ``Constante``, w = [0.9].
         * Se o método para cálculo do peso de inércia é ``TVIW-linear``, ``w = [0.9,0.4]``
         * Se o método para cálculo do peso de inércia é  ``TVIW-random``, ``w = None``
-        * Se o método para cálculo do peso de inércia é  ``TVIW-Adaptative-VI``, ``w = [0.9,0.3]``
+        * Se o método para cálculo do peso de inércia é  ``TVIW-Adaptive-vel``, ``w = [0.9,0.3]``
         
         ================================
         Fator de aceleração individual
@@ -966,15 +955,15 @@ class PSO:
         
         * Se o método para cálculo dos fatores de aceleração é ``Constante``, ``C1 = [2.0]``.
         * Se o método para cálculo dos fatores de aceleração é ``TVAC``, ``C1 = [2.5,0.5]`` . 
-        * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-VI``, ``C1 = [1.49]`` . 
+        * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-vel``, ``C1 = [1.49]`` .
 
         ================================
         Fator de aceleração social
         ================================
         
-        * Se o método para cálculo dos fatores de aceleração é ``Constante`` ``C1 = [2.0]``.
-        * Se o método para cálculo dos fatores de aceleração é ``TVAC``, ``C1 = [0.5,2.5]`` . 
-        * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-VI``, ``C1 = [1.49]`` . 
+        * Se o método para cálculo dos fatores de aceleração é ``Constante`` ``C2 = [2.0]``.
+        * Se o método para cálculo dos fatores de aceleração é ``TVAC``, ``C2 = [0.5,2.5]`` .
+        * Se o método para cálculo do peso de inércia é ``TVIW-Adaptive-vel``, ``C2 = [1.49]`` .
         
         **Observe que NEM todas as combinações de métodos possuem valores *default* de parâmetros. Use com cautela**
         '''
@@ -1518,6 +1507,7 @@ class PSO:
         ==========================
         - gerado por padrão
         * **Resumo.txt** : contém um resumo da otimização realizada
+
         - deve ser solicitado (vide keywords)
         * **Best_fitness.txt** :contém o valor da função objetivo avaliada no ponto ótimo
         * **gbest.txt** : contém o valor do ponto ótimo encontrado pelo algoritmo de PSO
@@ -1563,28 +1553,28 @@ class PSO:
             outfile = open(base_path + 'historico_fitness.txt', 'w')
             for elemento in self.historico_fitness:
                 outfile.write(str(elemento))
-                outfile.write('\n')
+                outfile.write('\r')
             outfile.close()
 
             # historico das posicoes
             outfile = open(base_path + 'historico_posicoes.txt', 'w')
             for elemento in self.historico_posicoes:
                 outfile.write(str(elemento))
-                outfile.write('\n')
+                outfile.write('\r')
             outfile.close()
 
             # index do histórico das posições e fitness
             outfile = open(base_path + 'index_historico.txt', 'w')
             for elemento in self.index_historico:
                 outfile.write(str(elemento))
-                outfile.write('\n')
+                outfile.write('\r')
             outfile.close()
 
             # index do histórico para desempenho
             outfile = open(base_path + 'index_desempenho.txt', 'w')
             for elemento in self.index_desempenho:
                 outfile.write(str(elemento))
-                outfile.write('\n')
+                outfile.write('\r')
             outfile.close()
 
             # arquivo com gbest
@@ -1596,84 +1586,84 @@ class PSO:
         if relatorio:
             # Resumo da otimização
             with open(base_path + titulo_relatorio, 'wb') as outfile:
-                outfile.write(('{:#^100}\n').format('RESUMO DO PSO'))
-                outfile.write(('{:-^100}\n').format('MÉTODO'))
-                outfile.write('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} \n'.format(self.metodo.algoritmo,
+                outfile.write(('{:#^100}\r').format('RESUMO DO PSO'))
+                outfile.write(('{:-^100}\r').format('MÉTODO'))
+                outfile.write('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} \r'.format(self.metodo.algoritmo,
                                                                                                      self.metodo.inercia,
                                                                                                      self.metodo.aceleracao,
                                                                                                      self.metodo.Vreinit))
-                outfile.write('Busca    : {:<8} | Restrição: {:<20} | Gbest     : {:<10} |  \n'.format(self.metodo.busca,
+                outfile.write('Busca    : {:<8} | Restrição: {:<20} | Gbest     : {:<10} |  \r'.format(self.metodo.busca,
                                                                                           str(self.metodo.restricao),
                                                                                           self.metodo.gbest))
 
-                outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\n')
+                outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\r')
 
-                outfile.write(('\n{:-^100}\n\n').format('RESTRIÇÕES'))
-                outfile.write('Restrições: {}\n'.format(self.metodo.restricao))
-                outfile.write('Superior  : {}\n'.format(self.limite_superior))
-                outfile.write('Inferior  : {}\n'.format(self.limite_inferior))
+                outfile.write(('\r{:-^100}\r\r').format('RESTRIÇÕES'))
+                outfile.write('Restrições: {}\r'.format(self.metodo.restricao))
+                outfile.write('Superior  : {}\r'.format(self.limite_superior))
+                outfile.write('Inferior  : {}\r'.format(self.limite_inferior))
 
-                outfile.write(('\n{:-^100}\n\n').format('PARADA'))
-                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\n')
-                outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\n')
+                outfile.write(('\r{:-^100}\r\r').format('PARADA'))
+                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\r')
+                outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\r')
 
                 if not self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada:
-                    outfile.write('Configurações:\n')
+                    outfile.write('Configurações:\r')
                 if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:
-                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\n'.format(self.parada_desvio))
+                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\r'.format(self.parada_desvio))
                 if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:
-                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\n'.format(self.parada_gbest))
+                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\r'.format(self.parada_gbest))
 
-                outfile.write('\n')
-                outfile.write(('\n{:-^100}\n\n').format('INICIALIZAÇÃO DO ALGORITMO'))
-                outfile.write('Posições de inicialização - superior: {}\n'.format(self.posinit_sup))
-                outfile.write('Posições de inicialização - inferior: {}\n'.format(self.posinit_inf))
+                outfile.write('\r')
+                outfile.write(('\r{:-^100}\r\r').format('INICIALIZAÇÃO DO ALGORITMO'))
+                outfile.write('Posições de inicialização - superior: {}\r'.format(self.posinit_sup))
+                outfile.write('Posições de inicialização - inferior: {}\r'.format(self.posinit_inf))
 
-                outfile.write(('\n{:-^100}\n\n').format('SELEÇÃO DOS PARÂMETROS'))
-                outfile.write('Número de partículas: {}\n'.format(self.Num_particulas))
-                outfile.write('Peso de inércia e fatores de aceleração:\n')
+                outfile.write(('\r{:-^100}\r\r').format('SELEÇÃO DOS PARÂMETROS'))
+                outfile.write('Número de partículas: {}\r'.format(self.Num_particulas))
+                outfile.write('Peso de inércia e fatores de aceleração:\r')
                 if self.metodo.inercia is not None:
-                    outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[0], self.C1[0], self.C2[0]))
-                    outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\n'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
+                    outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\r'.format(self.historico_w[0], self.C1[0], self.C2[0]))
+                    outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\r'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
                 else:
-                    outfile.write('    INÍCIO - w: None | c1: {:.1f} | c2: {:.1f}\n'.format(self.C1[0], self.C2[0]))
-                    outfile.write('    FIM    - w: None | c1: {:.1f} | c2: {:.1f}\n'.format(self.C1[1], self.C2[1]))
-                outfile.write('Vmax   : {}\n'.format(self.Vmax))
-                outfile.write('Vreinit: {}\n'.format(self.Vreinit))
-                outfile.write('deltaw : {}\n'.format(self.deltaw))
+                    outfile.write('    INÍCIO - w: None | c1: {:.1f} | c2: {:.1f}\r'.format(self.C1[0], self.C2[0]))
+                    outfile.write('    FIM    - w: None | c1: {:.1f} | c2: {:.1f}\r'.format(self.C1[1], self.C2[1]))
+                outfile.write('Vmax   : {}\r'.format(self.Vmax))
+                outfile.write('Vreinit: {}\r'.format(self.Vreinit))
+                outfile.write('deltaw : {}\r'.format(self.deltaw))
 
-                outfile.write(('\n{:-^100}\n\n').format('ITERAÇÕES'))
-                outfile.write('Iterações: {} (sendo 1 de inicialização)\n'.format(self.itmax))
-                outfile.write('Número mínimo de iterações realizadas : {}\n'.format(self.itmin))
+                outfile.write(('\r{:-^100}\r\r').format('ITERAÇÕES'))
+                outfile.write('Iterações: {} (sendo 1 de inicialização)\r'.format(self.itmax))
+                outfile.write('Número mínimo de iterações realizadas : {}\r'.format(self.itmin))
 
-                outfile.write(('\n{:-^100}\n\n').format('RESULTADOS'))
-                outfile.write('Ponto ótimo                       : {} \n'.format(self.gbest))
-                outfile.write('Fitness (valor da função objetivo): {} \n'.format(self.best_fitness))
-                outfile.write('Informações sobre parada:\n')
-                outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+'\n')
+                outfile.write(('\r{:-^100}\r\r').format('RESULTADOS'))
+                outfile.write('Ponto ótimo                       : {} \r'.format(self.gbest))
+                outfile.write('Fitness (valor da função objetivo): {} \r'.format(self.best_fitness))
+                outfile.write('Informações sobre parada:\r')
+                outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+'\r')
                 # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
                 testes_parada = {self.metodo._metodosdisponiveis['parada'][0]:str(not self.it_break),
                                  self.metodo._metodosdisponiveis['parada'][1]:str(self.teste_parada_desvio and self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada),
                                  self.metodo._metodosdisponiveis['parada'][2]:str(self.teste_parada_gbest and self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada)}
                 construtor = [' {'+parada+':^15}|' for parada in self.metodo.parada]
-                outfile.write('Atendido?       : '+''.join(construtor).format(**testes_parada)+'\n')
+                outfile.write('Atendido?       : '+''.join(construtor).format(**testes_parada)+'\r')
                 if self.it_break:
-                    outfile.write('Aviso           : O(s) critério(s) de convergência foi/foram atingido(s).\n')
+                    outfile.write('Aviso           : O(s) critério(s) de convergência foi/foram atingido(s).\r')
                 else:
-                    outfile.write('Aviso           : número máximo de iterações atingido.\n')
-                outfile.write('Status: \n')
-                outfile.write('    Número de iterações em que gbest ficou constante                 : {}\n'.format(self.it_gbest))
-                outfile.write('    Desvio relativo das partículas ao final das iterações            : {}\n'.format(self.desvio_fitness[self.n_desempenho-1]))
-                outfile.write('    Média do fitness (valor função objetivo) das partículas ao final : {}\n'.format(self.media_fitness[self.n_desempenho-1]))
+                    outfile.write('Aviso           : número máximo de iterações atingido.\r')
+                outfile.write('Status: \r')
+                outfile.write('    Número de iterações em que gbest ficou constante                 : {}\r'.format(self.it_gbest))
+                outfile.write('    Desvio relativo das partículas ao final das iterações            : {}\r'.format(self.desvio_fitness[self.n_desempenho-1]))
+                outfile.write('    Média do fitness (valor função objetivo) das partículas ao final : {}\r'.format(self.media_fitness[self.n_desempenho-1]))
 
-                outfile.write(('\n{:-^100}\n\n').format('HISTÓRICOS'))
-                outfile.write('HISTÓRICO DE DESEMPENHO:\n')
-                outfile.write('    Tamanho do histórico de desempenho: {}\n'.format(self.n_desempenho))
-                outfile.write('\n')
-                outfile.write('HISTÓRICO DE POSIÇÕES E FITNESS:\n')
-                outfile.write('    Tamanho do histórico para posição e fitness     : {}\n'.format(self.n_historico))
-                outfile.write('    Primeira posição para qual o histórico foi salvo: {}\n'.format(self.init_historico))
-                outfile.write(('{:#^100}\n').format('#'))
+                outfile.write(('\r{:-^100}\r\r').format('HISTÓRICOS'))
+                outfile.write('HISTÓRICO DE DESEMPENHO:\r')
+                outfile.write('    Tamanho do histórico de desempenho: {}\r'.format(self.n_desempenho))
+                outfile.write('\r')
+                outfile.write('HISTÓRICO DE POSIÇÕES E FITNESS:\r')
+                outfile.write('    Tamanho do histórico para posição e fitness     : {}\r'.format(self.n_historico))
+                outfile.write('    Primeira posição para qual o histórico foi salvo: {}\r'.format(self.init_historico))
+                outfile.write(('{:#^100}\r').format('#'))
                 outfile.close()
 
     def Graficos(self, base_path=None, **kwargs):
@@ -1713,7 +1703,7 @@ class PSO:
             >>> Otimizacao = PSO(sup,inf) # Criação da classe PSO
             >>> Otimizacao.Busca(FO)      # Comando para iniciar a busca
             >>> base_path = os.getcwd() + '/Exemplo'
-            >>> Otimizacao.Result_txt(base_path+'/Resultado/')   # Salvar os principais resultados em arquivos de texto
+            >>> Otimizacao.Relatorios(base_path+'/Resultado/')   # Salvar os principais resultados em arquivos de texto
             >>> Otimizacao.Graficos(base_path+'/Graficos/')     # Criação de gráficos com indicadores de desempenho do algoritmo de PSO
 
         ========
