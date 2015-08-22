@@ -13,10 +13,13 @@ ALGORITHMS implemented:
 7 - HPSO-CL (Linear Time-Varying Acceleration Coefficients Self-Organizing
 Particle Swarm Optimizer)
 
-*It's is possible to use the constriction factor method (CFM).
-
 RESTRICTION:
 Only box restrictions are implemented.
+
+STOP CRITERIA:
+1 - maximum number of iterations
+2 - standard deviation of particles
+3 - optimum point changes
 
 GRAPH:
 1 - graphs of performance.
