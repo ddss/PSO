@@ -1526,11 +1526,12 @@ class PSO:
 
         - titulo do arquivo de resumo:
         * ``titulo_relatorio`` (string): string para substituir o nome do arquivo de resumo da otimização
+        * ``quebra`` (string): string para definir a quebra de linha
         '''
         # ----------------------------------------------------------------------------------------
         # VALIDAÇÃO
         # ----------------------------------------------------------------------------------------
-        tiposkwargs = {'resumos_txt':bool,'relatorio':bool,'titulo_relatorio':str}
+        tiposkwargs = {'resumos_txt':bool,'relatorio':bool,'titulo_relatorio':str,'quebra':str}
 
         for key in tiposkwargs.keys():
             if kwargs.get(key) is not None:
@@ -1543,7 +1544,8 @@ class PSO:
         resumos_txt = False if kwargs.get('resumos_txt') is None else kwargs.get('resumos_txt')
         relatorio   = True if kwargs.get('relatorio') is None else kwargs.get('relatorio')
         titulo_relatorio = 'Resumo-otimizacao.txt' if kwargs.get('titulo_relatorio') is None else kwargs.get('titulo_relatorio')
-
+        quebra = kwargs.get('quebra') if kwargs.get('quebra') is not None else '\n'
+        
         if base_path == None:
             base_path = os.getcwd() + "/PSO/Relatorios/"
         Validacao_Diretorio(base_path)
@@ -1586,86 +1588,86 @@ class PSO:
         if relatorio:
             # Resumo da otimização
             with open(base_path + titulo_relatorio, 'wb') as outfile:
-                outfile.write(('{:#^100}\r').format('RESUMO DO PSO'))
-                outfile.write(('{:-^100}\r').format('MÉTODO'))
-                outfile.write('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} \r'.format(self.metodo.algoritmo,
+                outfile.write(('{:#^100}'+quebra).format('RESUMO DO PSO'))
+                outfile.write(('{:-^100}'+quebra).format('MÉTODO'))
+                outfile.write(('Algoritmo: {:<8} | Inercia  : {:<20} | Aceleracão: {:<10} | Vreinit: {} '+quebra).format(self.metodo.algoritmo,
                                                                                                      self.metodo.inercia,
                                                                                                      self.metodo.aceleracao,
                                                                                                      self.metodo.Vreinit))
-                outfile.write('Busca    : {:<8} | Restrição: {:<20} | Gbest     : {:<10} |  \r'.format(self.metodo.busca,
+                outfile.write(('Busca    : {:<8} | Restrição: {:<20} | Gbest     : {:<10} |  '+quebra).format(self.metodo.busca,
                                                                                           str(self.metodo.restricao),
                                                                                           self.metodo.gbest))
 
-                outfile.write('Parada   : '+', '.join(self.metodo.parada)+'\r')
+                outfile.write('Parada   : '+', '.join(self.metodo.parada)+quebra)
 
-                outfile.write(('\r{:-^100}\r\r').format('RESTRIÇÕES'))
-                outfile.write('Restrições: {}\r'.format(self.metodo.restricao))
-                outfile.write('Superior  : {}\r'.format(self.limite_superior))
-                outfile.write('Inferior  : {}\r'.format(self.limite_inferior))
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('RESTRIÇÕES'))
+                outfile.write(('Restrições: {}'+quebra).format(self.metodo.restricao))
+                outfile.write(('Superior  : {}'+quebra).format(self.limite_superior))
+                outfile.write(('Inferior  : {}'+quebra).format(self.limite_inferior))
 
-                outfile.write(('\r{:-^100}\r\r').format('PARADA'))
-                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+'\r')
-                outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+'\r')
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('PARADA'))
+                outfile.write('Critérios de parada: '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*self.metodo._metodosdisponiveis['parada'])+quebra)
+                outfile.write('Ativo?             : '+(' {:^15}|'*len(self.metodo._metodosdisponiveis['parada'])).format(*[str(met in self.metodo.parada) for met in self.metodo._metodosdisponiveis['parada']])+quebra)
 
                 if not self.metodo._metodosdisponiveis['parada'][0] in self.metodo.parada:
-                    outfile.write('Configurações:\r')
+                    outfile.write('Configurações:'+quebra)
                 if self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada:
-                    outfile.write('    Valor prentendido do desvio relativo das partículas: {}\r'.format(self.parada_desvio))
+                    outfile.write(('    Valor prentendido do desvio relativo das partículas: {}'+quebra).format(self.parada_desvio))
                 if self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada:
-                    outfile.write('    Número de iterações nas quais gbest deve estar constante: {}\r'.format(self.parada_gbest))
+                    outfile.write(('    Número de iterações nas quais gbest deve estar constante: {}'+quebra).format(self.parada_gbest))
 
-                outfile.write('\r')
-                outfile.write(('\r{:-^100}\r\r').format('INICIALIZAÇÃO DO ALGORITMO'))
-                outfile.write('Posições de inicialização - superior: {}\r'.format(self.posinit_sup))
-                outfile.write('Posições de inicialização - inferior: {}\r'.format(self.posinit_inf))
+                outfile.write(quebra)
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('INICIALIZAÇÃO DO ALGORITMO'))
+                outfile.write(('Posições de inicialização - superior: {}'+quebra).format(self.posinit_sup))
+                outfile.write(('Posições de inicialização - inferior: {}'+quebra).format(self.posinit_inf))
 
-                outfile.write(('\r{:-^100}\r\r').format('SELEÇÃO DOS PARÂMETROS'))
-                outfile.write('Número de partículas: {}\r'.format(self.Num_particulas))
-                outfile.write('Peso de inércia e fatores de aceleração:\r')
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('SELEÇÃO DOS PARÂMETROS'))
+                outfile.write(('Número de partículas: {}'+quebra).format(self.Num_particulas))
+                outfile.write('Peso de inércia e fatores de aceleração:'+quebra)
                 if self.metodo.inercia is not None:
-                    outfile.write('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\r'.format(self.historico_w[0], self.C1[0], self.C2[0]))
-                    outfile.write('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}\r'.format(self.historico_w[-1], self.C1[1], self.C2[1]))
+                    outfile.write(('    INÍCIO - w: {:.1f} | c1: {:.1f} | c2: {:.1f}'+quebra).format(self.historico_w[0], self.C1[0], self.C2[0]))
+                    outfile.write(('    FIM    - w: {:.1f} | c1: {:.1f} | c2: {:.1f}'+quebra).format(self.historico_w[-1], self.C1[1], self.C2[1]))
                 else:
-                    outfile.write('    INÍCIO - w: None | c1: {:.1f} | c2: {:.1f}\r'.format(self.C1[0], self.C2[0]))
-                    outfile.write('    FIM    - w: None | c1: {:.1f} | c2: {:.1f}\r'.format(self.C1[1], self.C2[1]))
-                outfile.write('Vmax   : {}\r'.format(self.Vmax))
-                outfile.write('Vreinit: {}\r'.format(self.Vreinit))
-                outfile.write('deltaw : {}\r'.format(self.deltaw))
+                    outfile.write(('    INÍCIO - w: None | c1: {:.1f} | c2: {:.1f}'+quebra).format(self.C1[0], self.C2[0]))
+                    outfile.write(('    FIM    - w: None | c1: {:.1f} | c2: {:.1f}'+quebra).format(self.C1[1], self.C2[1]))
+                outfile.write(('Vmax   : {}'+quebra).format(self.Vmax))
+                outfile.write(('Vreinit: {}'+quebra).format(self.Vreinit))
+                outfile.write(('deltaw : {}'+quebra).format(self.deltaw))
 
-                outfile.write(('\r{:-^100}\r\r').format('ITERAÇÕES'))
-                outfile.write('Iterações: {} (sendo 1 de inicialização)\r'.format(self.itmax))
-                outfile.write('Número mínimo de iterações realizadas : {}\r'.format(self.itmin))
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('ITERAÇÕES'))
+                outfile.write(('Iterações: {} (sendo 1 de inicialização)'+quebra).format(self.itmax))
+                outfile.write(('Número mínimo de iterações realizadas : {}'+quebra).format(self.itmin))
 
-                outfile.write(('\r{:-^100}\r\r').format('RESULTADOS'))
-                outfile.write('Ponto ótimo                       : {} \r'.format(self.gbest))
-                outfile.write('Fitness (valor da função objetivo): {} \r'.format(self.best_fitness))
-                outfile.write('Informações sobre parada:\r')
-                outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+'\r')
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('RESULTADOS'))
+                outfile.write(('Ponto ótimo                       : {} '+quebra).format(self.gbest))
+                outfile.write(('Fitness (valor da função objetivo): {} '+quebra).format(self.best_fitness))
+                outfile.write('Informações sobre parada:'+quebra)
+                outfile.write('Critérios ativos: '+(' {:^15}|'*len(self.metodo.parada)).format(*self.metodo.parada)+quebra)
                 # lista para identificar se o critério de parada foi atendido. Caso o critério não seja solicitado irá fornecer False
                 testes_parada = {self.metodo._metodosdisponiveis['parada'][0]:str(not self.it_break),
                                  self.metodo._metodosdisponiveis['parada'][1]:str(self.teste_parada_desvio and self.metodo._metodosdisponiveis['parada'][1] in self.metodo.parada),
                                  self.metodo._metodosdisponiveis['parada'][2]:str(self.teste_parada_gbest and self.metodo._metodosdisponiveis['parada'][2] in self.metodo.parada)}
                 construtor = [' {'+parada+':^15}|' for parada in self.metodo.parada]
-                outfile.write('Atendido?       : '+''.join(construtor).format(**testes_parada)+'\r')
+                outfile.write('Atendido?       : '+''.join(construtor).format(**testes_parada)+quebra)
                 if self.it_break:
-                    outfile.write('Aviso           : O(s) critério(s) de convergência foi/foram atingido(s).\r')
+                    outfile.write('Aviso           : O(s) critério(s) de convergência foi/foram atingido(s).'+quebra)
                 else:
-                    outfile.write('Aviso           : número máximo de iterações atingido.\r')
-                outfile.write('Status: \r')
-                outfile.write('    Número de iterações em que gbest ficou constante                 : {}\r'.format(self.it_gbest))
-                outfile.write('    Desvio relativo das partículas ao final das iterações            : {}\r'.format(self.desvio_fitness[self.n_desempenho-1]))
-                outfile.write('    Média do fitness (valor função objetivo) das partículas ao final : {}\r'.format(self.media_fitness[self.n_desempenho-1]))
+                    outfile.write('Aviso           : número máximo de iterações atingido.'+quebra)
+                outfile.write('Status: '+quebra)
+                outfile.write(('    Número de iterações em que gbest ficou constante                 : {}'+quebra).format(self.it_gbest))
+                outfile.write(('    Desvio relativo das partículas ao final das iterações            : {}'+quebra).format(self.desvio_fitness[self.n_desempenho-1]))
+                outfile.write(('    Média do fitness (valor função objetivo) das partículas ao final : {}'+quebra).format(self.media_fitness[self.n_desempenho-1]))
 
-                outfile.write(('\r{:-^100}\r\r').format('HISTÓRICOS'))
-                outfile.write('HISTÓRICO DE DESEMPENHO:\r')
-                outfile.write('    Tamanho do histórico de desempenho: {}\r'.format(self.n_desempenho))
-                outfile.write('\r')
-                outfile.write('HISTÓRICO DE POSIÇÕES E FITNESS:\r')
-                outfile.write('    Tamanho do histórico para posição e fitness     : {}\r'.format(self.n_historico))
-                outfile.write('    Primeira posição para qual o histórico foi salvo: {}\r'.format(self.init_historico))
-                outfile.write(('{:#^100}\r').format('#'))
+                outfile.write((quebra+'{:-^100}'+quebra+quebra).format('HISTÓRICOS'))
+                outfile.write('HISTÓRICO DE DESEMPENHO:'+quebra)
+                outfile.write(('    Tamanho do histórico de desempenho: {}'+quebra).format(self.n_desempenho))
+                outfile.write(quebra)
+                outfile.write(('HISTÓRICO DE POSIÇÕES E FITNESS:'+quebra))
+                outfile.write(('    Tamanho do histórico para posição e fitness     : {}'+quebra).format(self.n_historico))
+                outfile.write(('    Primeira posição para qual o histórico foi salvo: {}'+quebra).format(self.init_historico))
+                outfile.write(('{:#^100}'+quebra).format('#'))
                 outfile.close()
-
+                
     def Graficos(self, base_path=None, **kwargs):
         """
         Método para criação dos gráficos de indicadores do PSO, incluindo a função objetivo.
