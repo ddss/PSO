@@ -53,7 +53,7 @@ def myfunc(x,func_i,num_dim):
 #--- MAIN ---------------------------------------------------------------------+
 class Particle:
 
-    def __init__(self, bound, c1, c2, wi, wf, dim, i):
+    def __init__(self, kwarg, i):
         """
         Class used to define the particles
 
@@ -86,17 +86,19 @@ class Particle:
         update_position(self)
             Update particle position based on new velocity updates
         """
-        self.c1 = c1
-        self.c2 = c2
-        self.wi = wi
-        self.wf = wf
+        self.dim = kwarg["number_dimentions"]
+        self.bounds = kwarg["bounds"]
+        self.c1 = kwarg["c1"]
+        self.c2 = kwarg["c2"]
+        self.wi = kwarg["wi"]
+        self.wf = kwarg["wf"]
         self.pbest= array([[],[]])
         self.fit_best=10000
         self.fit = array([])
-        sobol_velocity = ([qmc.Sobol(d=2).random_base2(m=5)])
-        sobol_position = ([qmc.Sobol(d=2).random_base2(m=5)])
-        self.velocity = array((sobol_velocity[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
-        self.position = array((sobol_position[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
+        sobol_velocity = ([qmc.Sobol(d=self.dim).random_base2(m=5)])
+        sobol_position = ([qmc.Sobol(d=self.dim).random_base2(m=5)])
+        self.velocity = array((sobol_velocity[0][i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0]))
+        self.position = array((sobol_position[0][i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0]))
 
     def evaluate(self, myfunc):
         """
@@ -174,7 +176,7 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
-    def update_position(self, swarm, bounds):
+    def update_position(self, swarm):
         """
         Update particle position
 
@@ -182,7 +184,6 @@ class Particle:
             The updated position, result of adding the old position and the new velocity
         """
         self.swarm = swarm
-        self.bounds = bounds
 
         self.position = self.position + self.velocity
         if abs(self.swarm.position[0]) < self.bounds[0][1] and abs(self.swarm.position[1]) > self.bounds[0][1]:
@@ -237,13 +238,8 @@ class PSO():
             establishes the swarm
         """
         self.dim = kwarg["number_dimentions"]
-        self.bounds = kwarg["bounds"]
         self.num_part = kwarg["number_particles"]
         self.max_inter = kwarg["interactions"]
-        self.c1 = kwarg["c1"]
-        self.c2 = kwarg["c2"]
-        self.wi = kwarg["wi"]
-        self.wf = kwarg["wf"]
         self.pso_version = kwarg["pso_version"]
         self.history = self.history(self.dim)
         self.fit_gbest = 10000
@@ -251,7 +247,7 @@ class PSO():
         self.swarm = array([])
 
         for i in range(0, self.num_part):
-            self.swarm = append(self.swarm, Particle(self.bounds, self.c1, self.c2, self.wi, self.wf, self.dim, i))
+            self.swarm = append(self.swarm, Particle(kwarg, i))
         i = 0
         p = 0
         while i < self.max_inter and p < 1e3: # stopping criteria
@@ -274,7 +270,7 @@ class PSO():
                     self.swarm[j].pso_wl(self.gbest, self.max_inter, i)
                 elif self.pso_version == 3:
                     self.swarm[j].pso_wr(self.gbest)
-                self.swarm[j].update_position(self.swarm[j], self.bounds)
+                self.swarm[j].update_position(self.swarm[j])
             i += 1
         # ----------------------------------------------------------------------------------------
 class Graph:
