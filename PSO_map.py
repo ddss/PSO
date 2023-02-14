@@ -93,10 +93,10 @@ class Particle:
         self.pbest= array([[],[]])
         self.fit_best=10000
         self.fit = array([])
-        velocityh = ([qmc.Sobol(d=2).random_base2(m=5)])
-        positionh = ([qmc.Sobol(d=2).random_base2(m=5)])
-        self.velocity = array((velocityh[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
-        self.position = array((positionh[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
+        sobol_velocity = ([qmc.Sobol(d=2).random_base2(m=5)])
+        sobol_position = ([qmc.Sobol(d=2).random_base2(m=5)])
+        self.velocity = array((sobol_velocity[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
+        self.position = array((sobol_position[0][i]*(bound[0][1]-bound[0][0]))+(bound[0][0]))
 
     def evaluate(self, myfunc):
         """
@@ -174,21 +174,33 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
-    def update_position(self):
+    def update_position(self, swarm, bounds):
         """
         Update particle position
 
         return: array
             The updated position, result of adding the old position and the new velocity
         """
+        self.swarm = swarm
+        self.bounds = bounds
+
         self.position = self.position + self.velocity
+        if abs(self.swarm.position[0]) < self.bounds[0][1] and abs(self.swarm.position[1]) > self.bounds[0][1]:
+            self.swarm.position[1] = 2 * (self.swarm.position[1] / abs(self.swarm.position[1]))
+            self.swarm.velocity = self.swarm.velocity * -0.1
+        elif abs(self.swarm.position[0]) > self.bounds[0][1] and abs(self.swarm.position[1]) < self.bounds[0][1]:
+            self.swarm.position[0] = 2 * (self.swarm.position[0] / abs(self.swarm.position[0]))
+            self.swarm.velocity = self.swarm.velocity * -0.1
+        elif abs(self.swarm.position[0]) > self.bounds[0][1] and abs(self.swarm.position[1]) > self.bounds[0][1]:
+            self.swarm.position[0] = 2 * (self.swarm.position[0] / abs(self.swarm.position[0]))
+            self.swarm.position[1] = 2 * (self.swarm.position[1] / abs(self.swarm.position[1]))
+            self.swarm.velocity = self.swarm.velocity * -0.1
         # RESTRIÇÕES!!!!
         #x = array([1., 2., 3., 4., 5., 6.])
         #xmax = array([0.5, 0.5, 0.5, 10, 10, 10])
         # teste = x > xmax
         #x[x > xmax] = xmax[where(teste)[0]]
         # v[where(teste)[0]] = -PARAM_RED_VEL*v[where(teste)[0]]
-
 
 class PSO():
 
@@ -238,8 +250,6 @@ class PSO():
         self.gbest = []
         self.swarm = array([])
 
-        '''
-        '''
         for i in range(0, self.num_part):
             self.swarm = append(self.swarm, Particle(self.bounds, self.c1, self.c2, self.wi, self.wf, self.dim, i))
         i = 0
@@ -247,6 +257,7 @@ class PSO():
         while i < self.max_inter and p < 1e3: # stopping criteria
             for j in range(0, self.num_part):
                 self.swarm[j].evaluate(myfunc)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
 
                 # determines if the current particle is the best (globally)
                 if abs(self.swarm[j].fit-self.fit_gbest)<1e-6:
@@ -256,27 +267,6 @@ class PSO():
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
 
-                if abs(self.swarm[j].position[0]) < self.bounds[0][1] and abs(self.swarm[j].position[1]) < self.bounds[0][1]:
-                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-                elif abs(self.swarm[j].position[0]) < self.bounds[0][1] and abs(self.swarm[j].position[1]) > self.bounds[0][1]:
-                    self.swarm[j].position[1] = 2 * (self.swarm[j].position[1]/abs(self.swarm[j].position[1]))
-                    self.swarm[j].velocity = self.swarm[j].velocity * -0.1
-                    self.swarm[j].update_position()
-                    self.swarm[j].evaluate(myfunc)
-                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-                elif abs(self.swarm[j].position[0]) > self.bounds[0][1] and abs(self.swarm[j].position[1]) < self.bounds[0][1]:
-                    self.swarm[j].position[0] = 2 * (self.swarm[j].position[0]/abs(self.swarm[j].position[0]))
-                    self.swarm[j].velocity = self.swarm[j].velocity * -0.1
-                    self.swarm[j].update_position()
-                    self.swarm[j].evaluate(myfunc)
-                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-                elif abs(self.swarm[j].position[0]) > self.bounds[0][1] and abs(self.swarm[j].position[1]) > self.bounds[0][1]:
-                    self.swarm[j].position[0] = 2 * (self.swarm[j].position[0]/abs(self.swarm[j].position[0]))
-                    self.swarm[j].position[1] = 2 * (self.swarm[j].position[1]/abs(self.swarm[j].position[1]))
-                    self.swarm[j].velocity = self.swarm[j].velocity * -0.1
-                    self.swarm[j].update_position()
-                    self.swarm[j].evaluate(myfunc)
-                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
 
                 if self.pso_version == 1:
                     self.swarm[j].spso(self.gbest)
@@ -284,7 +274,7 @@ class PSO():
                     self.swarm[j].pso_wl(self.gbest, self.max_inter, i)
                 elif self.pso_version == 3:
                     self.swarm[j].pso_wr(self.gbest)
-                self.swarm[j].update_position()
+                self.swarm[j].update_position(self.swarm[j], self.bounds)
             i += 1
         # ----------------------------------------------------------------------------------------
 class Graph:
@@ -322,8 +312,7 @@ if __name__ == "__PSO__":
 function_index = int(3) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
 while (function_index < 1) or (function_index > 4):
     function_index = int(input("O índice da função precisa ser um número inteiro entre 1 e 4"))
-pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR
-#SANTANA, D. D. Inferência Estatística Clássica com Enxame de Partículas, Salvador: UFBA, 2014, p. 28–31.
+pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR [1]
 while (pso_version_index < 1) or (pso_version_index > 3):
     pso_version_index = int(input("O índice da versão PSO precisa ser um número inteiro entre 1 e 3"))
 options = {"pso_version":pso_version_index,
@@ -400,3 +389,6 @@ mp.xlabel("Maxinter")
 mp.ylabel("Velocity")
 mp.plot(pso.history.velocity[:,0],'.')
 mp.show()
+
+# References
+# 1 - SANTANA, D. D. Inferência Estatística Clássica com Enxame de Partículas, Salvador: UFBA, 2014, p. 28–31.
