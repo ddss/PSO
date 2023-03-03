@@ -339,10 +339,10 @@ class Graph:
 
 if __name__ == "__PSO__":
     main()
-function_index = int(3) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
+function_index = int(2) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
 while (function_index < 1) or (function_index > 4):
     function_index = int(input("O índice da função precisa ser um número inteiro entre 1 e 4"))
-pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR [1] 4-Pso_chongpeng
+pso_version_index = int(4) #1-SPSO 2-PSO-WL 3-PSO-WR [1] 4-Pso_chongpeng
 while (pso_version_index < 1) or (pso_version_index > 4):
     pso_version_index = int(input("O índice da versão PSO precisa ser um número inteiro entre 1 e 3"))
 options = {"pso_version":pso_version_index,
@@ -351,8 +351,8 @@ options = {"pso_version":pso_version_index,
        "interactions":int(500), # amount of interactions that each particle will make
        "c1":float(1), # cognitive constant
        "c2":float(2), # social constant
-       "wi":float(0.9), # initial inertia
-       "wf":float(0.4), # final inertia
+       "wi":float(2), # initial inertia
+       "wf":float(0.8), # final inertia
        "number_dimentions":int(2) # amount of dimentions
        }
 pso = PSO(lambda x: myfunc(x,function_index, options["number_dimentions"]), options)
