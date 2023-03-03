@@ -3,7 +3,7 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import sin, cos, sqrt, exp, e, array, append, random, vstack, diagflat, full
+from numpy import sin, cos, sqrt, exp, e, array, append, random, vstack, pi
 import plotly.graph_objects as go
 from bokeh.plotting import figure, show
 import matplotlib.pyplot as mp
@@ -92,6 +92,7 @@ class Particle:
         self.c2 = kwarg["c2"]
         self.wi = kwarg["wi"]
         self.wf = kwarg["wf"]
+        self.maxiter = kwarg["interactions"]
         self.pbest= array([[],[]])
         self.fit_best=10000
         self.fit = array([])
@@ -176,6 +177,30 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
+    def pso_chongpeng(self, g_best, i):
+        """
+        The PSO_WR (Random Time-Varying Inertia Weight Particle Swarm Optimizer)
+        update particle velocity multiplying velocity by inertia
+        and adding velocity cognitive and velocity social to it
+
+        Parameters
+        ----------
+        g_best: float
+            record the best value of all values
+        i: int
+            index
+        return: array
+            The updated velocity through the PSO method
+        """
+        r1 = random.random()
+        r2 = random.random()
+        k1 = random.randint(1)
+        k2 = 1
+        w = self.wf + ((self.wf - self.wi)*((1-(i/self.maxiter)**k1)**k2))
+        vel_cognitive = self.c1 * r1 * (self.pbest - self.position)
+        vel_social = self.c2 * r2 * (g_best - self.position)
+        self.velocity = w * self.velocity + vel_cognitive + vel_social
+
     def update_position(self, swarm):
         """
         Update particle position
@@ -241,6 +266,7 @@ class PSO():
         self.num_part = kwarg["number_particles"]
         self.max_inter = kwarg["interactions"]
         self.pso_version = kwarg["pso_version"]
+        self.bounds = kwarg["bounds"]
         self.history = self.history(self.dim)
         self.fit_gbest = 10000
         self.gbest = []
@@ -250,9 +276,12 @@ class PSO():
             self.swarm = append(self.swarm, Particle(kwarg, i))
         i = 0
         p = 0
+        g = 0
+        velocity_sum = 0
         while i < self.max_inter and p < 1e3: # stopping criteria
             for j in range(0, self.num_part):
                 self.swarm[j].evaluate(myfunc)
+                velocity_sum = velocity_sum + self.swarm[j].velocity
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
 
                 # determines if the current particle is the best (globally)
@@ -270,8 +299,13 @@ class PSO():
                     self.swarm[j].pso_wl(self.gbest, self.max_inter, i)
                 elif self.pso_version == 3:
                     self.swarm[j].pso_wr(self.gbest)
+                elif self.pso_version == 4:
+                    self.swarm[j].pso_chongpeng(self.gbest, i)
                 self.swarm[j].update_position(self.swarm[j])
+            g += 1
             i += 1
+        self.velocity_average = (velocity_sum/g)*(1/(pi*(1+(random.uniform(self.bounds[0][0], self.bounds[0][1]))**2)))
+        self.gbest_mo = self.gbest + self.velocity_average
         # ----------------------------------------------------------------------------------------
 class Graph:
     def __init__(self, coordinates):
@@ -308,8 +342,8 @@ if __name__ == "__PSO__":
 function_index = int(3) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
 while (function_index < 1) or (function_index > 4):
     function_index = int(input("O índice da função precisa ser um número inteiro entre 1 e 4"))
-pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR [1]
-while (pso_version_index < 1) or (pso_version_index > 3):
+pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR [1] 4-Pso_chongpeng
+while (pso_version_index < 1) or (pso_version_index > 4):
     pso_version_index = int(input("O índice da versão PSO precisa ser um número inteiro entre 1 e 3"))
 options = {"pso_version":pso_version_index,
        "bounds": array([[-2, 2],[-2, 2]]), # input limits [(x_min,x_max)]
@@ -322,6 +356,8 @@ options = {"pso_version":pso_version_index,
        "number_dimentions":int(2) # amount of dimentions
        }
 pso = PSO(lambda x: myfunc(x,function_index, options["number_dimentions"]), options)
+print(pso.velocity_average)
+print(pso.gbest_mo)
 print(pso.gbest)
 print(pso.fit_gbest)
 
