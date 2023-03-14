@@ -53,7 +53,7 @@ def myfunc(x,func_i,num_dim):
 #--- MAIN ---------------------------------------------------------------------+
 class Particle:
 
-    def __init__(self, kwarg, i):
+    def __init__(self, number_dimentions, **kwargs):
         """
         Class used to define the particles
 
@@ -86,20 +86,18 @@ class Particle:
         update_position(self)
             Update particle position based on new velocity updates
         """
-        self.dim = kwarg["number_dimentions"]
-        self.bounds = kwarg["bounds"]
-        self.c1 = kwarg["c1"]
-        self.c2 = kwarg["c2"]
-        self.wi = kwarg["wi"]
-        self.wf = kwarg["wf"]
-        self.maxiter = kwarg["interactions"]
+        self.dim = number_dimentions
+        self.bounds = kwargs["bounds"]
+        self.maxiter = kwargs["interactions"]
+        self.c1 = kwargs["c1"] if kwargs["c1"] is not None else 1
+        self.c2 = kwargs["c2"] if kwargs["c2"] is not None else 2
+        self.wi = kwargs["wi"] if kwargs["wi"] is not None else 0.9
+        self.wf = kwargs["wf"] if kwargs["wf"] is not None else 0.4
         self.pbest= array([[],[]])
         self.fit_best=10000
         self.fit = array([])
-        sobol_velocity = ([qmc.Sobol(d=self.dim).random_base2(m=5)])
-        sobol_position = ([qmc.Sobol(d=self.dim).random_base2(m=5)])
-        self.velocity = array((sobol_velocity[0][i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0]))
-        self.position = array((sobol_position[0][i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0]))
+        self.velocity = random.rand(self.dim)*(self.bounds[0][1]-self.bounds[0][0])+(self.bounds[0][0])
+        self.position = random.rand(self.dim)*(self.bounds[0][1]-self.bounds[0][0])+(self.bounds[0][0])
 
     def evaluate(self, myfunc):
         """
@@ -179,7 +177,9 @@ class Particle:
 
     def pso_chongpeng(self, g_best, i):
         """
-        The PSO_WR (Random Time-Varying Inertia Weight Particle Swarm Optimizer)
+        Chongpeng et al [2] proposed a variant of PSO with non-linearly decreasing inertia weight
+        where k1, k2 are two natural numbers, wi is the initial inertia weight, wf is the final value of weighting coefficient,
+        maxiter is the maximum number of iteration and i is current iteration.
         update particle velocity multiplying velocity by inertia
         and adding velocity cognitive and velocity social to it
 
@@ -221,12 +221,6 @@ class Particle:
             self.swarm.position[0] = 2 * (self.swarm.position[0] / abs(self.swarm.position[0]))
             self.swarm.position[1] = 2 * (self.swarm.position[1] / abs(self.swarm.position[1]))
             self.swarm.velocity = self.swarm.velocity * -0.1
-        # RESTRIÇÕES!!!!
-        #x = array([1., 2., 3., 4., 5., 6.])
-        #xmax = array([0.5, 0.5, 0.5, 10, 10, 10])
-        # teste = x > xmax
-        #x[x > xmax] = xmax[where(teste)[0]]
-        # v[where(teste)[0]] = -PARAM_RED_VEL*v[where(teste)[0]]
 
 class PSO():
 
@@ -235,13 +229,15 @@ class PSO():
         self.position = array(random.rand(1,dim))
         self.fitness = array(random.rand(1, 1))
         self.velocity = array(random.rand(1,dim))
+        self.vel_average = array(random.rand(1, dim))
 
-       def add(self, position, fitness, velocity):
+       def add(self, position, fitness, velocity, vel_average):
             self.position = vstack([self.position, position])
             self.fitness = vstack([self.fitness, fitness])
             self.velocity = vstack([self.velocity, velocity])
+            self.vel_average = vstack([self.vel_average, vel_average])
 
-    def __init__(self, myfunc, kwarg):
+    def __init__(self, myfunc, pso_version, number_dimentions, **kwargs):
         """
         Class that uses particles in an optimization loop
 
@@ -262,27 +258,34 @@ class PSO():
         swarm : list
             establishes the swarm
         """
-        self.dim = kwarg["number_dimentions"]
-        self.num_part = kwarg["number_particles"]
-        self.max_inter = kwarg["interactions"]
-        self.pso_version = kwarg["pso_version"]
-        self.bounds = kwarg["bounds"]
+        self.pso_version = pso_version
+        self.dim = number_dimentions
+        self.num_part = kwargs["number_particles"] if kwargs["number_particles"] is not None else 30
+        self.max_inter = kwargs["interactions"] if kwargs["interactions"] is not None else 500
+        self.bounds = kwargs["bounds"] if kwargs["bounds"] is not None else array([[-2, 2],[-2, 2]])
         self.history = self.history(self.dim)
         self.fit_gbest = 10000
         self.gbest = []
         self.swarm = array([])
+        self.sobol_velocity = qmc.Sobol(d=self.dim).random_base2(m=5)
+        self.sobol_position = qmc.Sobol(d=self.dim).random_base2(m=5)
 
         for i in range(0, self.num_part):
-            self.swarm = append(self.swarm, Particle(kwarg, i))
+            self.swarm = append(self.swarm, Particle(number_dimentions, bounds=self.bounds, interactions=self.max_inter, c1=kwargs['c1'], c2=kwargs['c2'], wi=kwargs['wi'], wf=kwargs['wf']))
+        if kwargs["sobol"] == "S":
+            for i in range(0, self.num_part):
+                self.swarm[i].velocity = (self.sobol_velocity[i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0])
+                self.swarm[i].position = (self.sobol_position[i]*(self.bounds[0][1]-self.bounds[0][0]))+(self.bounds[0][0])
         i = 0
         p = 0
-        g = 0
-        velocity_sum = 0
+        g = 1
+        self.velocity_sum = 0
         while i < self.max_inter and p < 1e3: # stopping criteria
             for j in range(0, self.num_part):
                 self.swarm[j].evaluate(myfunc)
-                velocity_sum = velocity_sum + self.swarm[j].velocity
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+                self.velocity_sum = self.velocity_sum + self.swarm[j].velocity
+                self.velocity_average = (self.velocity_sum/g)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity, self.velocity_average)
 
                 # determines if the current particle is the best (globally)
                 if abs(self.swarm[j].fit-self.fit_gbest)<1e-6:
@@ -304,8 +307,8 @@ class PSO():
                 self.swarm[j].update_position(self.swarm[j])
             g += 1
             i += 1
-        self.velocity_average = (velocity_sum/g)*(1/(pi*(1+(random.uniform(self.bounds[0][0], self.bounds[0][1]))**2)))
-        self.gbest_mo = self.gbest + self.velocity_average
+        #self.gbest_mo = self.gbest + (self.velocity_average*(random.uniform(self.bounds[0][0],self.bounds[0][1])))
+        #self.fit_mo = myfunc(self.gbest_mo)
         # ----------------------------------------------------------------------------------------
 class Graph:
     def __init__(self, coordinates):
@@ -339,25 +342,24 @@ class Graph:
 
 if __name__ == "__PSO__":
     main()
-function_index = int(2) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
+function_index = int(3) #1-Exponencial 2-Rastrigin 3-Shaffer 4-Ackley
 while (function_index < 1) or (function_index > 4):
     function_index = int(input("O índice da função precisa ser um número inteiro entre 1 e 4"))
-pso_version_index = int(4) #1-SPSO 2-PSO-WL 3-PSO-WR [1] 4-Pso_chongpeng
+pso_version_index = int(2) #1-SPSO 2-PSO-WL 3-PSO-WR [1] 4-pso_chongpeng [2]
 while (pso_version_index < 1) or (pso_version_index > 4):
-    pso_version_index = int(input("O índice da versão PSO precisa ser um número inteiro entre 1 e 3"))
-options = {"pso_version":pso_version_index,
-       "bounds": array([[-2, 2],[-2, 2]]), # input limits [(x_min,x_max)]
-       "number_particles":int(30), # amount of particles
-       "interactions":int(500), # amount of interactions that each particle will make
-       "c1":float(1), # cognitive constant
-       "c2":float(2), # social constant
-       "wi":float(2), # initial inertia
-       "wf":float(0.8), # final inertia
-       "number_dimentions":int(2) # amount of dimentions
-       }
-pso = PSO(lambda x: myfunc(x,function_index, options["number_dimentions"]), options)
-print(pso.velocity_average)
-print(pso.gbest_mo)
+    pso_version_index = int(input("O índice da versão PSO precisa ser um número inteiro entre 1 e 4"))
+number_dimentions=int(2)
+
+pso = PSO(lambda x: myfunc(x,function_index, number_dimentions), pso_version_index, number_dimentions,
+bounds=array([[-2, 2],[-2, 2]]), # input limits [(x_min,x_max)]
+number_particles=int(30), # amount of particles
+interactions=int(500), # amount of interactions that each particle will make
+c1=float(2), # cognitive constant
+c2=float(1), # social constant
+wi=float(0.9), # initial inertia
+wf=float(0.4), # final inertia
+sobol="S") # sobol startup
+
 print(pso.gbest)
 print(pso.fit_gbest)
 
@@ -421,6 +423,14 @@ mp.xlabel("Maxinter")
 mp.ylabel("Velocity")
 mp.plot(pso.history.velocity[:,0],'.')
 mp.show()
+# Interactions(x) X Velocity Average(x)
+mp.figure()
+mp.title('Maxinter versus Velocity Average')
+mp.xlabel("Maxinter")
+mp.ylabel("Velocity")
+mp.plot(pso.history.vel_average[:,0],'.')
+mp.show()
 
 # References
 # 1 - SANTANA, D. D. Inferência Estatística Clássica com Enxame de Partículas, Salvador: UFBA, 2014, p. 28–31.
+# 2 - Huang Chongpeng, Zhang Yuling, Jiang Dingguo and Xu Baoguo, "On Some Non-linear Decreasing Inertia Weight Strategies in Particle Swarm Optimization*," in Proceedings of the 26th Chinese Control Conference, Zhangjiajie, Hunan, China, 2007, pp. 570-753.
