@@ -250,11 +250,11 @@ class PSO:
             version of pso to be used for optimization
         number_dimentions: int
             amount of dimensions
-        bounds: array
+        bounds: array with shape (nd x 2)
             position restriction
         num_part:
             number of particles
-        maxiter:
+        maxiter: interge
             maximum number of interactions
         **kwargs:
             non-mandatory parameters

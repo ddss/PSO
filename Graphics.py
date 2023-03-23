@@ -62,20 +62,22 @@ class Graph:
 
     def matplotlib(self, number_dimentions):
         # Positions
+        label = ['$x_{}$'.format(i+1) for i in range(number_dimentions)]
+
         for i in range(number_dimentions - 1):
             for j in range(number_dimentions - 1):
                 if j >= i:
                     mp.figure()
-                    mp.title("x[i] versus x[j]")
-                    mp.xlabel("x[i]")
-                    mp.ylabel("x[j]")
+                    #mp.title(} x "label[i])
+                    mp.xlabel(label[i])
+                    mp.ylabel(label[j+1])
                     mp.plot(self.posit[1:, i], self.posit[1:, (j + 1)], '.')
                     mp.show()
         # Positions X Fitness
         for i in range(number_dimentions):
             mp.figure()
-            mp.title("x[i] versus fit")
-            mp.xlabel("x[i]")
+            #mp.title("x[i] versus fit")
+            mp.xlabel(label[i])
             mp.ylabel("fit")
             mp.plot(self.posit[1:, i], self.fit[1:], '.')
             mp.show()
