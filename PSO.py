@@ -4,7 +4,7 @@
 """
 
 from numpy import array, append, random, diag, dot, shape, where
-from scipy.stats import qmc
+#from scipy.stats import qmc
 import plotly.io as pio
 
 pio.renderers.default = 'browser'
@@ -193,9 +193,10 @@ class Particle:
         testemin = xpos < xmin
         xvel[testemax] = xvel[testemax] * -0.01
         xvel[testemin] = xvel[testemin] * -0.01
+        # TODO: investigar o uso do where - acho que não precisa
         xpos[testemax] = xmax[where(testemax)]
         xpos[testemin] = xmin[where(testemin)]
-
+        pass
 
 class PSO:
 
@@ -269,12 +270,13 @@ class PSO:
         self.velocity_average : float
             the average of all velocities
         """
+        #TODO: VALIDAÇÃO
         number_dimentions = (shape(bounds))[0]
         self.fit_gbest = 10000
         self.gbest = []
         self.swarm = array([])
-        init_sobol_vel = qmc.Sobol(d=number_dimentions).random_base2(m=5)
-        init_sobol_pos = qmc.Sobol(d=number_dimentions).random_base2(m=5)
+        #init_sobol_vel = qmc.Sobol(d=number_dimentions).random_base2(m=5)
+        #init_sobol_pos = qmc.Sobol(d=number_dimentions).random_base2(m=5)
         for i in range(0, num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
                 peso_velocity = diag(init_sobol_vel[i, :])
