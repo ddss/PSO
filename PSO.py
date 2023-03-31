@@ -3,7 +3,7 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import array, append, random, vstack, diag, dot
+from numpy import array, append, random, diag, dot, shape, where
 from scipy.stats import qmc
 import plotly.io as pio
 
@@ -24,7 +24,7 @@ class Particle:
             amount of dimensions
         bounds: array
             position restriction
-        **kwargs:
+        **kwargs: c1, c2, wi, wf, init_velocity, init_position
             non-mandatory parameters
 
         Attributes
@@ -68,14 +68,12 @@ class Particle:
         self.c2 = kwargs.get("c2") if kwargs.get("c2") is not None else 2
         self.wi = kwargs.get("wi") if kwargs.get("wi") is not None else 0.9
         self.wf = kwargs.get("wf") if kwargs.get("wf") is not None else 0.4
-        peso_vel = kwargs.get("init_velocity") if kwargs.get("init_velocity") is not None else diag(random.rand(number_dimentions))
-        peso_pos = kwargs.get("init_position") if kwargs.get("init_position") is not None else diag(random.rand(number_dimentions))
+        peso_vel = kwargs.get("peso_vel") if kwargs.get("peso_vel") is not None else diag(random.rand(number_dimentions))
+        peso_pos = kwargs.get("peso_pos") if kwargs.get("peso_pos") is not None else diag(random.rand(number_dimentions))
         self.pbest = array([[], []])
         self.fit_best = 10000
         self.fit = array([])
 
-        # corrigir
-        # velcocity e position como kwargs - validar a dimensão: nx1
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
 
@@ -187,29 +185,27 @@ class Particle:
             position restriction
         """
         self.position = self.position + self.velocity
-        if abs(swarm.position[0]) < bounds[0][1] < abs(swarm.position[1]):
-            swarm.position[1] = 2 * (swarm.position[1] / abs(swarm.position[1]))
-            swarm.velocity = swarm.velocity * -0.1
-        elif abs(swarm.position[0]) > bounds[0][1] > abs(swarm.position[1]):
-            swarm.position[0] = 2 * (swarm.position[0] / abs(swarm.position[0]))
-            swarm.velocity = swarm.velocity * -0.1
-        elif abs(swarm.position[0]) > bounds[0][1] and abs(swarm.position[1]) > bounds[0][1]:
-            swarm.position[0] = 2 * (swarm.position[0] / abs(swarm.position[0]))
-            swarm.position[1] = 2 * (swarm.position[1] / abs(swarm.position[1]))
-            swarm.velocity = swarm.velocity * -0.1
+        xvel = swarm.velocity
+        xpos = swarm.position
+        xmax = bounds[:, 1]
+        xmin = bounds[:, 0]
+        testemax = xpos > xmax
+        testemin = xpos < xmin
+        xvel[testemax] = xvel[testemax] * -0.01
+        xvel[testemin] = xvel[testemin] * -0.01
+        xpos[testemax] = xmax[where(testemax)]
+        xpos[testemin] = xmin[where(testemin)]
 
 
 class PSO:
 
     class history:
-        def __init__(self, dim):
+        def __init__(self):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
 
             Parameters
             ----------
-            dim : int
-                amount of dimensions
 
             Attributes
             ----------
@@ -227,16 +223,17 @@ class PSO:
             add(self, position, fitness, velocity, vel_average)
                 Makes an array with all the data for each parameter
             """
-            self.position = array(random.rand(1, dim))
-            self.fitness = array(random.rand(1, 1))
-            self.velocity = array(random.rand(1, dim))
-            self.vel_average = array(random.rand(1, dim))
+            self.position = ([[], [], [], [], [], [], [], [], [], []])
+            self.fitness = ([])
+            self.velocity = ([[], [], [], [], [], [], [], [], [], []])
+            self.vel_average = ([[], [], [], [], [], [], [], [], [], []])
 
-        def add(self, position, fitness, velocity, vel_average):
-            self.position = vstack([self.position, position])
-            self.fitness = vstack([self.fitness, fitness])
-            self.velocity = vstack([self.velocity, velocity])
-            self.vel_average = vstack([self.vel_average, vel_average])
+        def add(self, position, fitness, velocity, vel_average, dim):
+            for i in range(0, dim):
+                self.position[i] = append(self.position[i], position[i])
+                self.velocity[i] = append(self.velocity[i], velocity[i])
+                self.vel_average[i] = append(self.vel_average[i], vel_average[i])
+            self.fitness = append(self.fitness, fitness)
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -256,7 +253,7 @@ class PSO:
             number of particles
         maxiter: interge
             maximum number of interactions
-        **kwargs:
+        **kwargs: c1, c2, wi, wf, initial_swarm
             non-mandatory parameters
 
         Attributes
@@ -272,22 +269,23 @@ class PSO:
         self.velocity_average : float
             the average of all velocities
         """
-        number_dimentions = len(bounds)
-        self.history = self.history(number_dimentions)
+        number_dimentions = (shape(bounds))[0]
         self.fit_gbest = 10000
         self.gbest = []
         self.swarm = array([])
-        sobol_velocity = qmc.Sobol(d=number_dimentions).random_base2(m=5)
-        sobol_position = qmc.Sobol(d=number_dimentions).random_base2(m=5)
+        init_sobol_vel = qmc.Sobol(d=number_dimentions).random_base2(m=5)
+        init_sobol_pos = qmc.Sobol(d=number_dimentions).random_base2(m=5)
         for i in range(0, num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
-                peso_vel = diag(sobol_velocity[i, :])
-                peso_pos = diag(sobol_position[i, :])
+                peso_velocity = diag(init_sobol_vel[i, :])
+                peso_position = diag(init_sobol_pos[i, :])
             else:
-                peso_vel = None
-                peso_pos = None
+                peso_velocity = None
+                peso_position = None
             self.swarm = append(self.swarm, Particle(number_dimentions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
-                                                     wi=kwargs.get('wi'), wf=kwargs.get('wf'), init_velocity=peso_vel, init_position=peso_pos))
+                                                     wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
+
+        self.history = self.history()
         i = 0
         p = 0
         g = 1
@@ -297,7 +295,7 @@ class PSO:
                 self.swarm[j].evaluate(myfunction)
                 self.velocity_sum = self.velocity_sum + self.swarm[j].velocity
                 self.velocity_average = (self.velocity_sum/g)
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity, self.velocity_average)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity, self.velocity_average, number_dimentions)
 
                 # determines if the current particle is the best (globally)
                 if abs(self.swarm[j].fit-self.fit_gbest) < 1e-6:
@@ -307,13 +305,13 @@ class PSO:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
 
-                if pso_version == 1 or pso_version == 'SPSO':
+                if pso_version == 'SPSO':
                     self.swarm[j].spso(self.gbest)
-                elif pso_version == 2 or pso_version == 'PSO-WL':
+                elif pso_version == 'PSO-WL':
                     self.swarm[j].pso_wl(self.gbest, maxiter, i)
-                elif pso_version == 3 or pso_version == 'PSO-WR':
+                elif pso_version == 'PSO-WR':
                     self.swarm[j].pso_wr(self.gbest)
-                elif pso_version == 4 or pso_version == 'pso_chongpeng':
+                elif pso_version == 'pso_chongpeng':
                     self.swarm[j].pso_chongpeng(self.gbest, maxiter, i)
                 self.swarm[j].update_position(self.swarm[j], bounds)
             g += 1

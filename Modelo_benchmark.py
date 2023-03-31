@@ -19,26 +19,39 @@ def modelo_benchmark(x, function, num_dim):
             number of dimensions of the function
     """
     # Exponencial
-    if function == 1 or function == 'Exponencial':
+    if function == 'Exponencial':
         total = 0
         for i in range(num_dim):
             total += x[i] ** 2
         return total
     # Rastrigin
-    elif function == 2 or function == 'Rastrigin':
+    elif function == 'Rastrigin':
         total = 0
         for i in range(num_dim):
             total += x[i]**2-10*cos(2*3.14*x[i])+10
         return total
     # Shaffer's f6
-    elif function == 3 or function == 'Shaffer':
+    elif function == 'Shaffer':
         total = 0
         for i in range(num_dim):
             total += 0.5+((sin(sqrt(x[i]**2)))**2-0.5)/(1.0 + 0.001*(x[i]**2))**2
         return total
     # Ackley
-    elif function == 4 or function == 'Ackley':
+    elif function == 'Ackley':
         total = 0
         for i in range(num_dim):
             total += -20.0 * exp(-0.2 * sqrt((x[i]**2)/2)) - exp(cos(2*3.14*x[i]))/2 + 20 + e
+        return total
+    elif function == 'exp':
+            # Função Exponencial
+        aux = 0
+        for i in range(num_dim):
+            aux += x[i] ** 2
+        total = -exp(-0.5 * aux)
+        return total
+    elif function == 'rosenbrook':
+        # Função de Rosenbrock
+        total = 0
+        for i in range(num_dim):
+            total += 100 * (x[i] - (x[i] ** 2)) ** 2 + (x[i] - 1) ** 2
         return total
