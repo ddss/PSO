@@ -2,14 +2,15 @@
 Graphics
 @author: Renilton
 """
-from numpy import array
+from numpy import array, linspace, shape, sqrt
 import plotly.graph_objects as go
 from bokeh.plotting import figure, show
 import matplotlib.pyplot as mp
+import matplotlib.patches as mpatches
 
 
 class Graph:
-    def __init__(self, coordinates, fit, vel, vel_ave, dim):
+    def __init__(self, coordinates, fit, vel, vel_ave, fit_ave, vel_desv, fit_desv, bounds, optimal_point, optimal_fit):
         """
         Class used to define the particles
 
@@ -28,7 +29,13 @@ class Graph:
         self.fit = fit
         self.vel = vel
         self.vel_ave = vel_ave
-        self.dim = dim
+        self.fit_ave = fit_ave
+        self.vel_desv = vel_desv
+        self.fit_desv = fit_desv
+        self.dim = bounds.shape[0]
+        self.optimal_point = optimal_point
+        self.optimal_fit = optimal_fit
+
 
     # def bokeh(self):
     #     radii = 0.01
@@ -40,7 +47,7 @@ class Graph:
     #     p.yaxis.axis_label = 'Y'
     #     show(p)
     def plotly(self):
-        label = ['$x_{}$'.format(i+1) for i in range(self.dim)]
+        label = ['x{}'.format(i+1) for i in range(self.dim)]
         for i in range(self.dim - 1):
             for j in range(self.dim - 1):
                 if j >= i:
@@ -56,52 +63,73 @@ class Graph:
                             opacity=0.8
                         )
                     )])
-                    fig.update_layout(scene=dict(zaxis=dict(title='Fit')),  #, range=(0,40))),
-                                      title='Fit versus Positions(x,y)',
-                                      margin=dict(r=0, l=0, b=0, t=30)
+                    fig.update_layout(scene=dict(
+                                        xaxis=dict(title=(label[i])),
+                                        yaxis=dict(title=(label[j+1])),
+                                        zaxis=dict(title='Fit')), #, range=(0,40))),
+                                        title='Fit versus Positions(x,y)',
+                                        margin=dict(r=0, l=0, b=0, t=30)
                                       )
                     fig.show()
 
     def matplotlib(self):
         # Positions
-        label = ['$x_{}$'.format(i+1) for i in range(self.dim)]
         for i in range(self.dim - 1):
             for j in range(self.dim - 1):
                 if j >= i:
                     mp.figure()
-                    #mp.title(} x "label[i])
-                    mp.xlabel(label[i])
-                    mp.ylabel(label[j+1])
-                    mp.plot(self.posit[i], self.posit[(j + 1)], '.')
+                    mp.title('Positions x[{}] vs x[{}]'.format(i+1,j+2))
+                    mp.xlabel('x[{}]'.format(i+1))
+                    mp.ylabel('x[{}]'.format(j+2))
+                    levels = linspace(self.fit.min(), self.fit.max(), 10)
+                    mp.tricontourf(self.posit[i], self.posit[(j + 1)], self.fit, levels=levels, alpha=0.7)
+                    mp.plot(self.posit[i], self.posit[(j + 1)], '.', label='x[{}] vs x[{}]'.format(i+1,j+2), color='#202020')
+                    mp.plot(self.optimal_point[i], self.optimal_point[j+i], '.', color='red', label='optimal point')
+                    mp.legend()
                     mp.show()
         # Positions X Fitness
         for i in range(self.dim):
             mp.figure()
-            #mp.title("x[i] versus fit")
-            mp.xlabel(label[i])
+            mp.title('Position x[{}] vs Fit'.format(i+1))
+            mp.xlabel('x[{}]'.format(i+1))
             mp.ylabel("fit")
-            mp.plot(self.posit[i], self.fit, '.')
+            mp.plot(self.posit[i], self.fit, '.', label='x[{}] vs fit'.format(i+1))
+            mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
+            mp.legend()
             mp.show()
         # Interactions(x) X Fitness(x)
         mp.figure()
-        mp.title('Interactions versus Fit')
+        mp.title('Interactions vs Fit')
         mp.xlabel("Interactions")
         mp.ylabel("Fit")
-        mp.plot(self.fit, '.')
+        mp.plot(self.fit, '.', label='interaction vs fitness')
+        mp.legend()
+        mp.show()
+        # Interactions(x) X Fitness average(x)
+        mp.figure()
+        mp.title('Interactions vs Fitness average')
+        mp.xlabel("Interactions")
+        mp.ylabel("Fitness average")
+        mp.plot(self.fit_ave, '-', label='fitness average')
+        mp.plot(self.fit_desv, '-', label='standart desviation')
+        mp.legend()
         mp.show()
         # Interactions(x) X Velocity(x)
         mp.figure()
-        mp.title('Interactions versus Velocity')
+        mp.title('Interactions vs Velocity')
         mp.xlabel("Interactions")
         mp.ylabel("Velocity")
-        mp.plot(self.vel[0], '.')
-        mp.plot(self.vel[1], '.')
+        for i in range(self.dim):
+            mp.plot(self.vel[i], '.', label='x[{}]'.format(i+1), alpha=(1/(i+1)))
+        mp.legend()
         mp.show()
         # Interactions(x) X Velocity Average(x)
         mp.figure()
-        mp.title('Interactions versus Velocity Average')
+        mp.title('Interactions vs Velocity Average')
         mp.xlabel("Interactions")
         mp.ylabel("Velocity")
-        mp.plot(self.vel_ave[0], '.')
-        mp.plot(self.vel_ave[1], '.')
+        for i in range(self.dim):
+            mp.plot(self.vel_ave[i], '-', label='x[{}]'.format(i+1))
+            mp.plot(self.vel_desv[i], '-', label='x[{}] standart desviation'.format(i+1))
+        mp.legend()
         mp.show()

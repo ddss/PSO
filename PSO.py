@@ -3,9 +3,9 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import array, append, random, diag, dot, shape, where
-#from scipy.stats import qmc
+from numpy import array, append, random, diag, dot, shape, where, reshape, vstack, full, linspace, sqrt
 import plotly.io as pio
+from Validation import validation
 
 pio.renderers.default = 'browser'
 
@@ -70,10 +70,9 @@ class Particle:
         self.wf = kwargs.get("wf") if kwargs.get("wf") is not None else 0.4
         peso_vel = kwargs.get("peso_vel") if kwargs.get("peso_vel") is not None else diag(random.rand(number_dimentions))
         peso_pos = kwargs.get("peso_pos") if kwargs.get("peso_pos") is not None else diag(random.rand(number_dimentions))
-        self.pbest = array([[], []])
-        self.fit_best = 10000
+        self.pbest = array([])
+        self.fit_best = 1e10
         self.fit = array([])
-
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
 
@@ -193,15 +192,14 @@ class Particle:
         testemin = xpos < xmin
         xvel[testemax] = xvel[testemax] * -0.01
         xvel[testemin] = xvel[testemin] * -0.01
-        # TODO: investigar o uso do where - acho que não precisa
-        xpos[testemax] = xmax[where(testemax)]
-        xpos[testemin] = xmin[where(testemin)]
+        xpos[testemax] = xmax[testemax]
+        xpos[testemin] = xmin[testemin]
         pass
 
 class PSO:
 
     class history:
-        def __init__(self):
+        def __init__(self, dim):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
 
@@ -224,17 +222,39 @@ class PSO:
             add(self, position, fitness, velocity, vel_average)
                 Makes an array with all the data for each parameter
             """
-            self.position = ([[], [], [], [], [], [], [], [], [], []])
+            arr = [],
+            self.position = ([])
+            self.velocity = ([])
+            self.vel_average = ([])
+            self.fit_average = ([])
             self.fitness = ([])
-            self.velocity = ([[], [], [], [], [], [], [], [], [], []])
-            self.vel_average = ([[], [], [], [], [], [], [], [], [], []])
+            self.dim = dim
+            self.v_sdesviation = ([])
+            self.f_sdesviation = ([])
+            for i in range(self.dim):
+                self.position += arr
+                self.velocity += arr
+                self.vel_average += arr
+                self.v_sdesviation += arr
 
-        def add(self, position, fitness, velocity, vel_average, dim):
-            for i in range(0, dim):
+        def add(self, position, fitness, velocity, vel_average, fit_average, svdesviation, sfdesviation):
+            for i in range(0, self.dim):
                 self.position[i] = append(self.position[i], position[i])
                 self.velocity[i] = append(self.velocity[i], velocity[i])
                 self.vel_average[i] = append(self.vel_average[i], vel_average[i])
+                self.v_sdesviation[i] = append(self.v_sdesviation[i], svdesviation[i])
             self.fitness = append(self.fitness, fitness)
+            self.fit_average = append(self.fit_average, fit_average)
+            self.f_sdesviation = append(self.f_sdesviation, sfdesviation)
+
+        def restric(self, restriction_max):
+            # TODO: trabalhar com filtros
+            if restriction_max:
+                fmax = full(shape(self.fitness), restriction_max)
+                teste = self.fitness <= fmax
+                self.fitness = self.fitness[teste]
+                for i in range(self.dim):
+                    self.position[i] = self.position[i][where(teste)]
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -270,34 +290,55 @@ class PSO:
         self.velocity_average : float
             the average of all velocities
         """
-        #TODO: VALIDAÇÃO
-        number_dimentions = (shape(bounds))[0]
-        self.fit_gbest = 10000
+        validation(bounds, num_part, maxiter)
+        number_dimentions = bounds.shape[0]
+        self.fit_gbest = 1e10
         self.gbest = []
         self.swarm = array([])
-        #init_sobol_vel = qmc.Sobol(d=number_dimentions).random_base2(m=5)
-        #init_sobol_pos = qmc.Sobol(d=number_dimentions).random_base2(m=5)
+        if kwargs.get("initial_swarm") == 'Sobol':
+            from scipy.stats import qmc
+            init_sobol_vel = qmc.Sobol(d=number_dimentions).random_base2(m=round(sqrt(num_part)))
+            init_sobol_pos = qmc.Sobol(d=number_dimentions).random_base2(m=round(sqrt(num_part)))
+        if kwargs.get("initial_swarm") == 'Pattern':
+            init_pattern_pos = array([linspace(0,1,num_part), linspace(0,1,num_part), linspace(1,0,num_part), linspace(1,0,num_part)])
+            init_pattern_vel = array([linspace(0,0.5,num_part), linspace(0.5,0,num_part), linspace(0,0.5,num_part), linspace(0.5,0,num_part)])
         for i in range(0, num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
                 peso_velocity = diag(init_sobol_vel[i, :])
                 peso_position = diag(init_sobol_pos[i, :])
+            elif kwargs.get("initial_swarm") == 'Pattern':
+                peso_velocity = diag(init_pattern_vel[:number_dimentions, i])
+                peso_position = diag(init_pattern_pos[:number_dimentions, i])
             else:
                 peso_velocity = None
                 peso_position = None
             self.swarm = append(self.swarm, Particle(number_dimentions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
 
-        self.history = self.history()
+        self.history = self.history(number_dimentions)
         i = 0
         p = 0
-        g = 1
         self.velocity_sum = 0
+        self.fitness_sum = 0
+        self.velocity_sum_squared = 0
+        self.fitness_sum_squared = 0
         while i < maxiter and p < 1e3:  # stopping criteria
             for j in range(0, num_part):
                 self.swarm[j].evaluate(myfunction)
-                self.velocity_sum = self.velocity_sum + self.swarm[j].velocity
-                self.velocity_average = (self.velocity_sum/g)
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity, self.velocity_average, number_dimentions)
+
+                self.fitness_sum = self.fitness_sum + self.swarm[j].fit
+                self.fitness_average = (self.fitness_sum/(i+1))
+
+                self.velocity_sum = self.velocity_sum + abs(self.swarm[j].velocity)
+                self.velocity_average = (self.velocity_sum/(i+1))
+
+                self.velocity_sum_squared = self.velocity_sum_squared + ((abs(self.swarm[j].velocity)-self.velocity_average) ** 2)
+                self.fitness_sum_squared = self.fitness_sum_squared + ((self.swarm[j].fit-self.fitness_average) ** 2)
+                self.svdeviation = sqrt(self.velocity_sum_squared/(i+1))
+                self.sfdeviation = sqrt(self.fitness_sum_squared/(i+1))
+
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity, self.velocity_average,
+                                 self.fitness_average, self.svdeviation, self.sfdeviation)
 
                 # determines if the current particle is the best (globally)
                 if abs(self.swarm[j].fit-self.fit_gbest) < 1e-6:
@@ -315,9 +356,17 @@ class PSO:
                     self.swarm[j].pso_wr(self.gbest)
                 elif pso_version == 'pso_chongpeng':
                     self.swarm[j].pso_chongpeng(self.gbest, maxiter, i)
+                else:
+                    raise NameError("Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
                 self.swarm[j].update_position(self.swarm[j], bounds)
-            g += 1
             i += 1
+        self.history.restric(kwargs.get("restriction_max"))
+
         # self.gbest_mo = self.gbest + (self.velocity_average*(random.uniform(bounds[0][0],bounds[0][1])))
         # self.fit_mo = myfunction(self.gbest_mo)
         # ----------------------------------------------------------------------------------------
+
+# References
+# 1 - SANTANA, D. D. Inferência Estatística Clássica com Enxame de Partículas, Salvador: UFBA, 2014, p. 28–31.
+# 2 - Huang Chongpeng, Zhang Yuling, Jiang Dingguo and Xu Baoguo, "On Some Non-linear Decreasing Inertia Weight Strategies
+# in Particle Swarm Optimization*," in Proceedings of the 26th Chinese Control Conference, Zhangjiajie, Hunan, China, 2007, pp. 570-753.
