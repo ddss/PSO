@@ -27,7 +27,7 @@ print(pso.gbest)
 print(pso.fit_gbest)
 
 graph = Graph(pso.history.sposition, pso.history.fitness, pso.history.svelocity, bounds, pso.gbest, pso.fit_gbest)
-#graph.pos_fit_3d()
+graph.pos_fit_3d()
 graph.positions()
 graph.pos_fit_2d()
 graph.int_fitness()

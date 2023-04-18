@@ -9,10 +9,9 @@ import plotly.io as pio
 pio.renderers.default = 'browser'
 
 # --- MAIN ---------------------------------------------------------------------+
-
-
 class Particle:
 
+    #TODO: dimensions
     def __init__(self, number_dimentions, bounds, **kwargs):
         """
         Class used to define the particles
@@ -23,7 +22,7 @@ class Particle:
         bounds: array
             position restriction
         **kwargs: c1, c2, wi, wf, init_velocity, init_position
-            non-mandatory parameters
+            c1 (float): cognitive constant
         Attributes
         ----------
         c1 : int
@@ -49,7 +48,7 @@ class Particle:
         evaluate(myfunction)
             Evaluate the objetive function and record its value
         spso(g_best)
-            Update particle velocity adding velocity cognitive and velocity social to velocity
+            Update particle velocity adding cognitive velocity and social velocity to it
         pso_wl(g_best, maxiter, i)
             Update particle velocity multiplying velocity by inertia and adding velocity cognitive and velocity social to it
         pso_wr(self, g_best)
@@ -59,6 +58,7 @@ class Particle:
         update_position(self, swarm, bounds)
             Update particle position based on new velocity updates
         """
+        #TODO: trazer referências para esta documentação
         self.c1 = kwargs.get("c1") if kwargs.get("c1") is not None else 1
         self.c2 = kwargs.get("c2") if kwargs.get("c2") is not None else 2
         self.wi = kwargs.get("wi") if kwargs.get("wi") is not None else 0.9
@@ -70,7 +70,7 @@ class Particle:
         self.fit = array([])
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
-
+        # Todo: iniciar fit_best logo aqui. myfunction como atributo protegido
     def evaluate(self, myfunction):
         """
         Evaluate the objetive function and record its value
@@ -181,13 +181,15 @@ class Particle:
         swarm.velocity[testemin] = swarm.velocity[testemin] * -0.01
         swarm.position[testemax] = xmax[testemax]
         swarm.position[testemin] = xmin[testemin]
-
+        #TODO: parâmetro para o usuário escolher o que fazer com a velociodade
 
 class PSO:
 
     @property
     def available_methods(self):
         return ['SPSO', 'PSO-WL', 'PSO-WR', 'PSO-Chonpeng']
+
+    #TODO: mapear novas propriedades
 
     class history:
         def __init__(self, dim):
@@ -219,20 +221,22 @@ class PSO:
             self.fit_average = ([])
             self.fitness = ([])
             self.dim = dim
-            self.v_sdesviation = ([])
-            self.f_sdesviation = ([])
+
             for i in range(self.dim):
                 self.position += arr
                 self.velocity += arr
 
         def add(self, position, fitness, velocity):
+            #TODO: trabalhar com array > stack
             for i in range(0, self.dim):
                 self.position[i] = append(self.position[i], position[i])
                 self.velocity[i] = append(self.velocity[i], velocity[i])
             self.fitness = append(self.fitness, fitness)
+
         def map(self, restriction_max, function_cut):
-            # TODO: incluir variáveis para fmax e function_cut
-            # TODO: salvar em variáveis separadas
+            #TODO: restriction_max > function_max
+            #TODO: faz direto > sem o primeiro if
+            #TODO:Function name > region
             if function_cut is not None:
                 teste = function_cut
             else:
@@ -241,13 +245,14 @@ class PSO:
             self.fitness = self.fitness[teste]
             for i in range(self.dim):
                 self.position[i] = self.position[i][where(teste)]
+
         def stack(self):
+            #TODO: converter este método para uso direto em add
             self.sposition = array([self.position[0]])
             self.svelocity = array([self.velocity[0]])
             for i in range(1, self.dim):
                 self.sposition = vstack((self.sposition, self.position[i]))
                 self.svelocity = vstack((self.svelocity, self.velocity[i]))
-
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -322,6 +327,8 @@ class PSO:
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
 
         self.history = self.history(number_dimentions)
+        #TODO: inicializar histórico aqui, com as primeiras posições/velocidades das partículas
+
         i = 0
         k = 0
 
