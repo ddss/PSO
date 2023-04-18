@@ -2,7 +2,7 @@
 Graphics
 @author: Renilton
 """
-from numpy import array, linspace, shape, sqrt
+from numpy import array, linspace, shape, sqrt, average, append, vstack, std
 import plotly.graph_objects as go
 from bokeh.plotting import figure, show
 import matplotlib.pyplot as mp
@@ -10,10 +10,9 @@ import matplotlib.patches as mpatches
 
 
 class Graph:
-    def __init__(self, coordinates, fit, vel, vel_ave, fit_ave, vel_desv, fit_desv, bounds, optimal_point, optimal_fit):
+    def __init__(self, coordinates, fit, vel, bounds, optimal_point, optimal_fit):
         """
         Class used to define the particles
-
         Attributes
         ----------
         coordinates : array
@@ -24,29 +23,28 @@ class Graph:
             a list with the velocity of each particle in each interaction
         vel_ave : array
             a list with the velocity average of each particle in each interaction
+        fit_ave: array
+            a list with the fitness average of each particle in each interaction
+        vel_desv: array
+            a list with the standart desviation of velocity average
+        fit_desv: array
+            a list with the standart desviation of fitness average
+        bounds: array with shape (nd x 2)
+            position restriction
+        optimal_point: float
+            the optimal point
+        optimal_fit: float
+            the fitness of the optimal point
         """
         self.posit = coordinates
         self.fit = fit
         self.vel = vel
-        self.vel_ave = vel_ave
-        self.fit_ave = fit_ave
-        self.vel_desv = vel_desv
-        self.fit_desv = fit_desv
         self.dim = bounds.shape[0]
         self.optimal_point = optimal_point
         self.optimal_fit = optimal_fit
 
 
-    # def bokeh(self):
-    #     radii = 0.01
-    #     colors = array([[r, g, 150] for r, g in zip(50+100*abs(self.x), 50+100*abs(self.y))], dtype="uint8")
-    #     tools = "hover,crosshair,pan,wheel_zoom,zoom_in,zoom_out,box_zoom,undo,redo,reset,tap,save,box_select,poly_select,lasso_select,help"
-    #     p = figure(title="Positions (x,y)", tools=tools)
-    #     p.scatter(self.x, self.y, radius=radii, fill_color=colors, fill_alpha=1, line_color=None, name="PSO")
-    #     p.xaxis.axis_label = 'X'
-    #     p.yaxis.axis_label = 'Y'
-    #     show(p)
-    def plotly(self):
+    def pos_fit_3d(self):
         label = ['x{}'.format(i+1) for i in range(self.dim)]
         for i in range(self.dim - 1):
             for j in range(self.dim - 1):
@@ -72,8 +70,10 @@ class Graph:
                                       )
                     fig.show()
 
-    def matplotlib(self):
-        # Positions
+
+
+    # Positions
+    def positions(self):
         for i in range(self.dim - 1):
             for j in range(self.dim - 1):
                 if j >= i:
@@ -83,11 +83,14 @@ class Graph:
                     mp.ylabel('x[{}]'.format(j+2))
                     levels = linspace(self.fit.min(), self.fit.max(), 10)
                     mp.tricontourf(self.posit[i], self.posit[(j + 1)], self.fit, levels=levels, alpha=0.7)
+                    mp.colorbar()
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label='x[{}] vs x[{}]'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+i], '.', color='red', label='optimal point')
                     mp.legend()
                     mp.show()
-        # Positions X Fitness
+
+    # Positions X Fitness
+    def pos_fit_2d(self):
         for i in range(self.dim):
             mp.figure()
             mp.title('Position x[{}] vs Fit'.format(i+1))
@@ -97,7 +100,9 @@ class Graph:
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
             mp.show()
-        # Interactions(x) X Fitness(x)
+
+    # Interactions(x) X Fitness(y)
+    def int_fitness(self):
         mp.figure()
         mp.title('Interactions vs Fit')
         mp.xlabel("Interactions")
@@ -105,31 +110,66 @@ class Graph:
         mp.plot(self.fit, '.', label='interaction vs fitness')
         mp.legend()
         mp.show()
-        # Interactions(x) X Fitness average(x)
+
+    # Interactions(x) X Fitness average(y)
+    def int_fit_average(self):
         mp.figure()
         mp.title('Interactions vs Fitness average')
         mp.xlabel("Interactions")
         mp.ylabel("Fitness average")
-        mp.plot(self.fit_ave, '-', label='fitness average')
-        mp.plot(self.fit_desv, '-', label='standart desviation')
+        self.ave = array([])
+        for i in range(0,len(self.fit)):
+            self.ave = append(self.ave, average(self.fit[:(i+1)]))
+        mp.plot(self.ave, '-', label='fitness average')
         mp.legend()
         mp.show()
-        # Interactions(x) X Velocity(x)
+
+    # Interactions(x) X Fitness standart desviation(y)
+    def int_fit_sd(self):
+        mp.figure()
+        mp.title('Interactions vs Fitness standart desviation')
+        mp.xlabel("Interactions")
+        mp.ylabel("Fitness standart desviation")
+        sd = array([])
+        for i in range(0, len(self.fit)):
+            sd = append(sd, std((self.fit[:(i+1)], self.ave[:(i+1)])))
+        mp.plot(sd, '-', label='standart desviation')
+        mp.legend()
+        mp.show()
+
+    # Interactions(x) X Velocity(x)
+    def int_velocity(self):
         mp.figure()
         mp.title('Interactions vs Velocity')
         mp.xlabel("Interactions")
         mp.ylabel("Velocity")
         for i in range(self.dim):
-            mp.plot(self.vel[i], '.', label='x[{}]'.format(i+1), alpha=(1/(i+1)))
+            mp.plot(self.vel[i], '.', label='v[{}]'.format(i+1), alpha=(1/(i+1)))
         mp.legend()
         mp.show()
-        # Interactions(x) X Velocity Average(x)
+
+    # Interactions(x) X Velocity Average(x)
+    def int_vel_average(self):
         mp.figure()
         mp.title('Interactions vs Velocity Average')
         mp.xlabel("Interactions")
-        mp.ylabel("Velocity")
+        mp.ylabel("Velocity average")
+        avev = [[0], [0], [0]]
+        for i in range(0, self.dim):
+            for j in range(0, (shape(self.vel)[1])):
+                avev[i] = vstack((avev[i], average(self.vel[i, :j+1])))
         for i in range(self.dim):
-            mp.plot(self.vel_ave[i], '-', label='x[{}]'.format(i+1))
-            mp.plot(self.vel_desv[i], '-', label='x[{}] standart desviation'.format(i+1))
+            mp.plot(avev[i], '-', label='v[{}]'.format(i+1))
+        mp.legend()
+        mp.show()
+
+    # Interactions(x) X Velocity standart desviation(x)
+    def int_vel_sd(self):
+        mp.figure()
+        mp.title('Interactions vs Velocity standart desviation')
+        mp.xlabel("Interactions")
+        mp.ylabel("Velocity standart desviation")
+        for i in range(self.dim):
+            mp.plot(self.vel_desv[i], '-', label='v[{}] standart desviation'.format(i+1))
         mp.legend()
         mp.show()
