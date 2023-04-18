@@ -2,7 +2,7 @@
 Graphics
 @author: Renilton
 """
-from numpy import array, linspace, shape, sqrt, average, append, vstack, std
+from numpy import array, linspace, shape, sqrt, average, append, vstack, std, zeros
 import plotly.graph_objects as go
 from bokeh.plotting import figure, show
 import matplotlib.pyplot as mp
@@ -10,7 +10,7 @@ import matplotlib.patches as mpatches
 
 
 class Graph:
-    def __init__(self, coordinates, fit, vel, bounds, optimal_point, optimal_fit):
+    def __init__(self, coordinates, fit, vel, bounds, optimal_point, optimal_fit, inter, num_part):
         """
         Class used to define the particles
         Attributes
@@ -42,6 +42,8 @@ class Graph:
         self.dim = bounds.shape[0]
         self.optimal_point = optimal_point
         self.optimal_fit = optimal_fit
+        self.inter = inter
+        self.num_part = num_part
 
 
     def pos_fit_3d(self):
@@ -118,8 +120,8 @@ class Graph:
         mp.xlabel("Interactions")
         mp.ylabel("Fitness average")
         self.ave = array([])
-        for i in range(0,len(self.fit)):
-            self.ave = append(self.ave, average(self.fit[:(i+1)]))
+        for i in range(0, self.inter):
+            self.ave = append(self.ave, average(self.fit[(self.num_part*i):(self.num_part*(i+1))]))
         mp.plot(self.ave, '-', label='fitness average')
         mp.legend()
         mp.show()
@@ -131,8 +133,12 @@ class Graph:
         mp.xlabel("Interactions")
         mp.ylabel("Fitness standart desviation")
         sd = array([])
-        for i in range(0, len(self.fit)):
-            sd = append(sd, std((self.fit[:(i+1)], self.ave[:(i+1)])))
+        aux = zeros(self.num_part)
+        for i in range(0, self.inter):
+            aux[:] = self.ave[i]
+            # print((self.fit[(self.num_part*i):(self.num_part*(i+1))]))
+            # print(aux)
+            sd = append(sd, std((self.fit[(self.num_part*i):(self.num_part*(i+1))], aux)))
         mp.plot(sd, '-', label='standart desviation')
         mp.legend()
         mp.show()

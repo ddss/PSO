@@ -18,15 +18,15 @@ pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, 
           wi=float(0.9),  # initial inertia
           wf=float(0.4),  # final inertia
           initial_swarm='Pattern',  # Pattern, Sobol or None
-          restriction_max=None,  # fit restriction
-          function_cut=None,  # fit array restriction
-          significant_evolution=1e-6,  # significant evolution
-          stop_criterion=1e3)  # stopping criterion
+          function_cut=None,  # fit restriction
+          vel_restraint=float(0.01),  # velocity restraint
+          sig_evolution_value=float(1e-6),  # significant evolution
+          significant_evolution=int(1e3))  # stopping criterion
 
 print(pso.gbest)
 print(pso.fit_gbest)
 
-graph = Graph(pso.history.sposition, pso.history.fitness, pso.history.svelocity, bounds, pso.gbest, pso.fit_gbest)
+graph = Graph(pso.history.position, pso.history.fitness, pso.history.velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
 graph.pos_fit_3d()
 graph.positions()
 graph.pos_fit_2d()
@@ -35,4 +35,4 @@ graph.int_fit_average()
 graph.int_fit_sd()
 graph.int_velocity()
 graph.int_vel_average()
-#graph.int_vel_sd()
+# graph.int_vel_sd()
