@@ -80,7 +80,7 @@ class Graph:
             for j in range(self.dim - 1):
                 if j >= i:
                     mp.figure()
-                    mp.title('Positions x[{}] vs x[{}]'.format(i+1,j+2))
+                    mp.title('Positions x{} vs x{}'.format(i+1,j+2))
                     mp.xlabel('x[{}]'.format(i+1))
                     mp.ylabel('x[{}]'.format(j+2))
                     levels = linspace(self.fit.min(), self.fit.max(), 10)
@@ -95,10 +95,10 @@ class Graph:
     def pos_fit_2d(self):
         for i in range(self.dim):
             mp.figure()
-            mp.title('Position x[{}] vs Fit'.format(i+1))
-            mp.xlabel('x[{}]'.format(i+1))
+            #mp.title('Position x{} vs Fit'.format(i+1))
+            mp.xlabel(r'$x_{}$'.format(i+1))
             mp.ylabel("fit")
-            mp.plot(self.posit[i], self.fit, '.', label='x[{}] vs fit'.format(i+1))
+            mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
             mp.show()

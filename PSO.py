@@ -12,9 +12,12 @@ pio.renderers.default = 'browser'
 # --- MAIN ---------------------------------------------------------------------+
 class Particle:
 
+    #TODO: cite references
+    # TODO: dimensão das variáveis
     def __init__(self, number_dimensions, bounds, **kwargs):
         """
         Class used to define the particles
+
         Parameters
         ----------
         number_dimensions: int
@@ -34,6 +37,7 @@ class Particle:
                 diagonal array of size (nd x nd) with values from a distribution or random
             init_position : array
                 diagonal array of size (nd x nd) with values from a distribution or random
+
         Attributes
         ----------
         c1 : int
@@ -58,6 +62,7 @@ class Particle:
             particle position
         velocity : array
             particle velocity
+
         Methods
         -------
         evaluate(myfunction)
@@ -85,6 +90,7 @@ class Particle:
         self.wf = kwargs.get("wf") if kwargs.get("wf") is not None else 0.4
         peso_vel = kwargs.get("peso_vel") if kwargs.get("peso_vel") is not None else diag(random.rand(number_dimensions))
         peso_pos = kwargs.get("peso_pos") if kwargs.get("peso_pos") is not None else diag(random.rand(number_dimensions))
+
         self.pbest = array([])
         self.fit_best = float()
         self.fit = array([])
@@ -94,25 +100,26 @@ class Particle:
 
     def evaluate(self, myfunction, inter):
         """
-        Evaluate the objetive function and record its value
+        Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
         Parameters
         ----------
         myfunction: result of the function at a given point
-        inter: number of interactions
+        inter: interaction number
         """
         self.fit = myfunction(self.position)
+        # self.fit = self.__function(self.position,*args)
         if self.fit < self.fit_best or inter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
 
     def spso(self, g_best):
         """
-        The SPSO (Standard Particle Swarm Optimizer) update particle velocity
+        The SPSO (Standard Particle Swarm Optimizer)  update particle velocity
         adding velocity cognitive and velocity social to velocity
         Parameters
         ----------
         g_best: float
-            record the best value of all values
+            the position value of all particles of the swarm
         """
         r1 = random.random()
         r2 = random.random()
@@ -184,9 +191,11 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
-    def update_position(self, bounds, vel_restraint):
+    #todo: bounds converter em atributo
+    def update_position(self, bounds, vel_restraint=-0.01):
         """
         Update particle position
+
         Parameters
         ----------
         swarm: array
@@ -197,15 +206,12 @@ class Particle:
             value by which the velocity will be multiplied when the particle crosses the edges
         """
         self.position = self.position + self.velocity
-        xmax = bounds[:, 1]
-        xmin = bounds[:, 0]
-        testemax = self.position > xmax
-        testemin = self.position < xmin
+        testemax = self.position > bounds[:, 1]
+        testemin = self.position < bounds[:, 0]
         self.velocity[testemax] = self.velocity[testemax] * vel_restraint
         self.velocity[testemin] = self.velocity[testemin] * vel_restraint
-        self.position[testemax] = xmax[testemax]
-        self.position[testemin] = xmin[testemin]
-
+        self.position[testemax] = bounds[:, 1][testemax]
+        self.position[testemin] = bounds[:, 0][testemin]
 
 class PSO:
 
@@ -214,7 +220,6 @@ class PSO:
         return ['SPSO', 'PSO-WL', 'PSO-WR', 'PSO-Chonpeng']
 
     # TODO: mapear novas propriedades
-
     class history:
         def __init__(self, dim):
             """
@@ -246,8 +251,14 @@ class PSO:
                 self._position += arr
                 self._velocity += arr
 
+            # receber swarm
+            # i = 0
+            # self._position = reshape(swarm[0].position,(nd,1))
+            # for i in range(1,number_particles):
+            #   self._position = hstack(self._position,reshape(swarm[i].position,(nd,1)))
+
         def add(self, position, fitness, velocity):
-            # TODO: trabalhar com array > stack
+            # TODO: trabalhar com array > hstack > Para isso fazer reshape (nd x 1)
             for i in range(0, self.dim):
                 self._position[i] = append(self._position[i], position[i])
                 self._velocity[i] = append(self._velocity[i], velocity[i])
@@ -364,11 +375,12 @@ class PSO:
                 elif type(kwargs.get("significant_evolution")) != int:
                     raise TypeError("The variable 'significant_evolution' must be an integer.")
 
-
         validation(bounds, num_part, maxiter, c1=kwargs.get("c1"), c2=kwargs.get("c2"), wi=kwargs.get("wi"), wf=kwargs.get("wf"),
                    initial_swarm=kwargs.get("initial_swarm"), vel_restraint=kwargs.get("vel_restraint"),
                    sig_evolution_value=kwargs.get("sig_evolution_value"), significant_evolution=kwargs.get("significant_evolution"))
+
         number_dimensions = bounds.shape[0]
+        #todo fit_gbest sem valor incial
         self.fit_gbest = 1e10
         self.gbest = []
         self.swarm = array([])
@@ -379,9 +391,10 @@ class PSO:
             from scipy.stats import qmc
             init_sobol_vel = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
             init_sobol_pos = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
-        if kwargs.get("initial_swarm") == 'Pattern':
+        elif kwargs.get("initial_swarm") == 'Pattern':
             init_pattern_pos = array([linspace(0, 1, num_part), linspace(0, 1, num_part), linspace(1, 0, num_part), linspace(1, 0, num_part)])
             init_pattern_vel = array([linspace(0, 0.5, num_part), linspace(0.5, 0, num_part), linspace(0, 0.5, num_part), linspace(0.5, 0, num_part)])
+
         for i in range(0, num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
                 peso_velocity = diag(init_sobol_vel[i, :])
@@ -398,7 +411,7 @@ class PSO:
         self.history = self.history(number_dimensions)
         # TODO: inicializar histórico aqui, com as primeiras posições/velocidades das partículas
 
-        k = 0
+        k = 0 # k
         self.inter = 0
         self.maxiter = maxiter if maxiter is not None else 1e3
         self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
