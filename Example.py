@@ -13,13 +13,13 @@ bounds = array([[-10, 10], [-10, 10], [-10, 10]])  # input limits [(x_min,x_max)
 number_particles = 30  # amount of particles
 interactions = 500  # amount of interactions that each particle will make
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, number_particles, interactions,
-          c1=float(2),  # cognitive constant
-          c2=float(1),  # social constant
+          c1=float(1),  # cognitive constant
+          c2=float(2),  # social constant
           wi=float(0.9),  # initial inertia
           wf=float(0.4),  # final inertia
-          initial_swarm='Pattern',  # Pattern, Sobol or None
-          function_cut=200,  # fit restriction
-          vel_restraint=float(0.01),  # velocity restraint
+          initial_swarm=None,  # Pattern, Sobol or None
+          function_cut=None,  # fit restriction
+          vel_restraint=float(-0.01),  # velocity restraint
           sig_evolution_value=float(1e-6),  # significant evolution
           significant_evolution=int(1e3))  # stopping criterion
 
@@ -27,12 +27,13 @@ print(pso.gbest)
 print(pso.fit_gbest)
 
 graph = Graph(pso.history.position, pso.history.fitness, pso.history.velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
-graph.pos_fit_3d()
+# graph.pos_fit_3d()
 graph.positions()
+# graph.gif()
 graph.pos_fit_2d()
 graph.int_fitness()
 graph.int_fit_average()
 graph.int_fit_sd()
 graph.int_velocity()
 graph.int_vel_average()
-# graph.int_vel_sd()
+graph.int_vel_sd()

@@ -80,24 +80,41 @@ class Graph:
             for j in range(self.dim - 1):
                 if j >= i:
                     mp.figure()
-                    mp.title('Positions x{} vs x{}'.format(i+1,j+2))
-                    mp.xlabel('x[{}]'.format(i+1))
-                    mp.ylabel('x[{}]'.format(j+2))
+                    mp.xlabel(r'$x_{}$'.format(i+1))
+                    mp.ylabel(r'$x_{}$'.format(j+2))
                     levels = linspace(self.fit.min(), self.fit.max(), 10)
                     mp.tricontourf(self.posit[i], self.posit[(j + 1)], self.fit, levels=levels, alpha=0.7)
                     mp.colorbar()
-                    mp.plot(self.posit[i], self.posit[(j + 1)], '.', label='x[{}] vs x[{}]'.format(i+1,j+2), color='#202020')
+                    mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+i], '.', color='red', label='optimal point')
                     mp.legend()
                     mp.show()
+
+    def gif(self):
+        for i in range(0, 30):
+            mp.figure()
+            mp.title('Interaction {}'.format(i+1))
+            mp.xlabel(r'$x_{}$'.format(1))
+            mp.ylabel(r'$x_{}$'.format(2))
+            levels = linspace(self.fit.min(), self.fit.max(), 10)
+            mp.tricontourf(self.posit[0], self.posit[1], self.fit, levels=levels, alpha=0.5)
+            mp.colorbar()
+            self.tick = self.posit[0, (1000*i):(1000*(i+1))]
+            self.tick2 = self.posit[1, (1000*i):(1000*(i+1))]
+            mp.plot(self.tick, self.tick2, '.', label=r'$x_{} vs x_{}$'.format(1,2), color='#202020')
+            mp.plot(self.optimal_point[0], self.optimal_point[1], '.', color='red', label=r'$optimal point$')
+            #mp.legend()
+            mp.xlim(-10, 10)
+            mp.ylim(-10, 10)
+            mp.show()
+
 
     # Positions X Fitness
     def pos_fit_2d(self):
         for i in range(self.dim):
             mp.figure()
-            #mp.title('Position x{} vs Fit'.format(i+1))
             mp.xlabel(r'$x_{}$'.format(i+1))
-            mp.ylabel("fit")
+            mp.ylabel('Fit')
             mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
@@ -106,9 +123,8 @@ class Graph:
     # Interactions(x) X Fitness(y)
     def int_fitness(self):
         mp.figure()
-        mp.title('Interactions vs Fit')
-        mp.xlabel("Interactions")
-        mp.ylabel("Fit")
+        mp.xlabel('Interactions')
+        mp.ylabel('Fit')
         mp.plot(self.fit, '.', label='interaction vs fitness')
         mp.legend()
         mp.show()
@@ -116,9 +132,8 @@ class Graph:
     # Interactions(x) X Fitness average(y)
     def int_fit_average(self):
         mp.figure()
-        mp.title('Interactions vs Fitness average')
-        mp.xlabel("Interactions")
-        mp.ylabel("Fitness average")
+        mp.xlabel('Interactions')
+        mp.ylabel('Fitness average')
         self.ave = array([])
         for i in range(0, self.inter):
             self.ave = append(self.ave, average(self.fit[(self.num_part*i):(self.num_part*(i+1))]))
@@ -129,15 +144,12 @@ class Graph:
     # Interactions(x) X Fitness standart desviation(y)
     def int_fit_sd(self):
         mp.figure()
-        mp.title('Interactions vs Fitness standart desviation')
-        mp.xlabel("Interactions")
-        mp.ylabel("Fitness standart desviation")
+        mp.xlabel('Interactions')
+        mp.ylabel('Fitness standart desviation')
         sd = array([])
         aux = zeros(self.num_part)
         for i in range(0, self.inter):
             aux[:] = self.ave[i]
-            # print((self.fit[(self.num_part*i):(self.num_part*(i+1))]))
-            # print(aux)
             sd = append(sd, std((self.fit[(self.num_part*i):(self.num_part*(i+1))], aux)))
         mp.plot(sd, '-', label='standart desviation')
         mp.legend()
@@ -146,36 +158,39 @@ class Graph:
     # Interactions(x) X Velocity(x)
     def int_velocity(self):
         mp.figure()
-        mp.title('Interactions vs Velocity')
-        mp.xlabel("Interactions")
-        mp.ylabel("Velocity")
+        mp.xlabel('Interactions')
+        mp.ylabel('Velocity')
         for i in range(self.dim):
-            mp.plot(self.vel[i], '.', label='v[{}]'.format(i+1), alpha=(1/(i+1)))
+            mp.plot(self.vel[i], '.', label=r'$v_{}$'.format(i+1), alpha=(1/(i+1)))
         mp.legend()
         mp.show()
 
     # Interactions(x) X Velocity Average(x)
     def int_vel_average(self):
         mp.figure()
-        mp.title('Interactions vs Velocity Average')
-        mp.xlabel("Interactions")
-        mp.ylabel("Velocity average")
-        avev = [[0], [0], [0]]
+        mp.xlabel('Interactions')
+        mp.ylabel('Velocity average')
+        arr = [],
+        self.avev = ([])
         for i in range(0, self.dim):
-            for j in range(0, (shape(self.vel)[1])):
-                avev[i] = vstack((avev[i], average(self.vel[i, :j+1])))
-        for i in range(self.dim):
-            mp.plot(avev[i], '-', label='v[{}]'.format(i+1))
+            self.avev += arr
+            for j in range(0, self.inter):
+                self.avev[i] = append(self.avev[i], average(self.vel[i, (self.num_part * j):(self.num_part * (j + 1))]))
+            mp.plot(self.avev[i], '-', label=r'$v_{}$'.format(i+1))
         mp.legend()
         mp.show()
 
     # Interactions(x) X Velocity standart desviation(x)
     def int_vel_sd(self):
         mp.figure()
-        mp.title('Interactions vs Velocity standart desviation')
-        mp.xlabel("Interactions")
-        mp.ylabel("Velocity standart desviation")
-        for i in range(self.dim):
-            mp.plot(self.vel_desv[i], '-', label='v[{}] standart desviation'.format(i+1))
+        mp.xlabel('Interactions')
+        mp.ylabel('Velocity standart desviation')
+        sd = ([[], [], []])
+        aux = zeros(self.num_part)
+        for i in range(0, self.dim):
+            for j in range(0, self.inter):
+                aux[:] = self.avev[i][j]
+                sd[i] = append(sd[i], std((self.vel[i, (self.num_part * j):(self.num_part * (j + 1))], aux)))
+            mp.plot(sd[i], '-', label=r'$v_{}$'.format(i+1))
         mp.legend()
         mp.show()

@@ -3,7 +3,7 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import array, append, random, diag, dot, shape, where, reshape, vstack, full, linspace, sqrt, ndarray
+from numpy import array, append, random, diag, dot, shape, where, reshape, hstack, vstack, full, linspace, sqrt, ndarray
 import plotly.io as pio
 
 pio.renderers.default = 'browser'
@@ -12,17 +12,17 @@ pio.renderers.default = 'browser'
 # --- MAIN ---------------------------------------------------------------------+
 class Particle:
 
-    #TODO: cite references
-    # TODO: dimensão das variáveis
-    def __init__(self, number_dimensions, bounds, **kwargs):
+    def __init__(self, myfunction, number_dimensions, bounds, **kwargs):
         """
         Class used to define the particles
 
         Parameters
         ----------
+        myfunction : function
+            result of the function at a given point
         number_dimensions: int
             amount of dimensions
-        bounds: array
+        bounds: array with shape (nd x 2)
             position restriction
         **kwargs:
             c1 : int
@@ -33,10 +33,10 @@ class Particle:
                 initial inertia weight
             wf : float
                 final inertia weight
-            init_velocity : array
-                diagonal array of size (nd x nd) with values from a distribution or random
-            init_position : array
-                diagonal array of size (nd x nd) with values from a distribution or random
+            init_velocity : array with shape (nd x nd)
+                diagonal array with values from a distribution or random
+            init_position : array with shape (nd x nd)
+                diagonal array with values from a distribution or random
 
         Attributes
         ----------
@@ -48,34 +48,41 @@ class Particle:
             initial inertia weight
         wf : float
             final inertia weight
-        peso_vel : array
-            diagonal array of size (nd x nd) with values from a distribution or random
-        peso_pos : array
-            diagonal array of size (nd x nd) with values from a distribution or random
+        peso_vel : array with shape (nd x nd)
+            diagonal array with values from a distribution or random
+        peso_pos : array with shape (nd x nd)
+            diagonal array with values from a distribution or random
         pbest : array
             the best individual position
         fit_best : int
             the lowest individual value
         fit : list
             individual value
-        position : array
+        position : array with shape (1 x nd)
             particle position
-        velocity : array
+        velocity : array with shape (1 x nd)
             particle velocity
+        __function : function
+            result of the function at a given point
 
         Methods
         -------
-        evaluate(myfunction)
+        evaluate(__function)
             Evaluate the objetive function and record its value
         spso(g_best)
             Update particle velocity adding cognitive velocity and social velocity to it
+            SPSO (Standard Particle Swarm Optimizer) is a version of pso taken from the dissertation [1].
         pso_wl(g_best, maxiter, i)
             Update particle velocity multiplying velocity by inertia and adding velocity cognitive and velocity social to it
+            PSO_WL (Linear Time-Varying inercia Weight Particle Swarm Optimizer) is a version of pso taken from the dissertation [1].
         pso_wr(self, g_best)
             Update particle velocity multiplying velocity by inertia and adding velocity cognitive and velocity social to it
+            PSO_WR (Random Time-Varying Inertia Weight Particle Swarm Optimizer) is a version of pso taken from the dissertation [1].
         pso_chongpeng(self, g_best, maxiter, i)
             Update particle velocity multiplying velocity by inertia and adding velocity cognitive and velocity social to it
-        update_position(self, swarm, bounds)
+            PSO_CHONGPENG (Non-linear Decreasing Inertia Weight Particle Swarm Optimizer) is a version of pso taken from the article [2].
+
+        update_position(self, vel_restraint)
             Update particle position based on new velocity updates
 
         References
@@ -90,24 +97,23 @@ class Particle:
         self.wf = kwargs.get("wf") if kwargs.get("wf") is not None else 0.4
         peso_vel = kwargs.get("peso_vel") if kwargs.get("peso_vel") is not None else diag(random.rand(number_dimensions))
         peso_pos = kwargs.get("peso_pos") if kwargs.get("peso_pos") is not None else diag(random.rand(number_dimensions))
-
+        self.bounds = bounds
         self.pbest = array([])
         self.fit_best = float()
         self.fit = array([])
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
-        # Todo: iniciar fit_best logo aqui. myfunction como atributo protegido
+        self.__function = myfunction
 
-    def evaluate(self, myfunction, inter):
+
+    def evaluate(self, inter):
         """
         Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
         Parameters
         ----------
-        myfunction: result of the function at a given point
         inter: interaction number
         """
-        self.fit = myfunction(self.position)
-        # self.fit = self.__function(self.position,*args)
+        self.fit = self.__function(self.position)
         if self.fit < self.fit_best or inter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
@@ -191,37 +197,35 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
-    #todo: bounds converter em atributo
-    def update_position(self, bounds, vel_restraint=-0.01):
+    def update_position(self, vel_restraint=-0.01):
         """
         Update particle position
 
         Parameters
         ----------
-        swarm: array
-            Group of particles with their positions, velocities and fitness
-        bounds: array
-            position restriction
         vel_restraint: float
-            value by which the velocity will be multiplied when the particle crosses the edges
+            value by which the velocity will be multiplied when the particle touches the edges
         """
         self.position = self.position + self.velocity
-        testemax = self.position > bounds[:, 1]
-        testemin = self.position < bounds[:, 0]
+        testemax = self.position > self.bounds[:, 1]
+        testemin = self.position < self.bounds[:, 0]
         self.velocity[testemax] = self.velocity[testemax] * vel_restraint
         self.velocity[testemin] = self.velocity[testemin] * vel_restraint
-        self.position[testemax] = bounds[:, 1][testemax]
-        self.position[testemin] = bounds[:, 0][testemin]
+        self.position[testemax] = self.bounds[:, 1][testemax]
+        self.position[testemin] = self.bounds[:, 0][testemin]
 
 class PSO:
 
     @property
     def available_methods(self):
         return ['SPSO', 'PSO-WL', 'PSO-WR', 'PSO-Chonpeng']
+    # @property
+    # def fit_gbest(self):
+    #     return {self.fit_gbest}
 
     # TODO: mapear novas propriedades
     class history:
-        def __init__(self, dim):
+        def __init__(self, number_dimensions, swarm, num_part):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
             Parameters
@@ -230,72 +234,61 @@ class PSO:
                 number of dimensions
             Attributes
             ----------
-            self.position : array
+            self._position : array with shape (1 x nd)
                 an array to record the positional coordinates of each particle in each interaction
-            self.fitness : array
+            self.fitness : array with shape (1 x 1)
                 an array to record the fitness of each particle in each interaction
-            self.velocity : array
+            self._velocity : array  with shape (1 x nd)
                 an array to record the velocity coordinates of each particle in each interaction
             Methods
             -------
             add(self, position, fitness, velocity)
                 Makes an array with all the data for each parameter
             """
-            arr = [],
-            self._position = ([])
-            self._velocity = ([])
-            self.fitness = ([])
-            self.dim = dim
-
-            for i in range(self.dim):
-                self._position += arr
-                self._velocity += arr
+            self.number_dimensions = number_dimensions
+            self._position = reshape(swarm[0].position, (self.number_dimensions, 1))
+            self._velocity = reshape(swarm[0].velocity, (self.number_dimensions, 1))
+            self.fitness = swarm[0].fit
+            for i in range(1, num_part):
+                self._position = hstack((self._position, reshape(swarm[i].position, (self.number_dimensions, 1))))
+                self._velocity = hstack((self._velocity, reshape(swarm[i].velocity, (self.number_dimensions, 1))))
 
             # receber swarm
             # i = 0
             # self._position = reshape(swarm[0].position,(nd,1))
-            # for i in range(1,number_particles):
-            #   self._position = hstack(self._position,reshape(swarm[i].position,(nd,1)))
+            # for i in range(1,num_part):
+            #   self._position = hstack(self._position,reshape(swarm[i].position,(self.number_dimensions,1)))
 
         def add(self, position, fitness, velocity):
             # TODO: trabalhar com array > hstack > Para isso fazer reshape (nd x 1)
-            for i in range(0, self.dim):
-                self._position[i] = append(self._position[i], position[i])
-                self._velocity[i] = append(self._velocity[i], velocity[i])
+            for i in range(0, self.number_dimensions):
+                self._position[i] = hstack((self._position[i], position[i]))
+                self._velocity[i] = hstack((self._velocity[i], velocity[i]))
             self.fitness = append(self.fitness, fitness)
 
         def region(self, function_cut):
-            # TODO: faz direto > sem o primeiro if
             fmax = full(shape(self.fitness), function_cut)
             teste = (self.fitness <= fmax)
             self.fitness = self.fitness[teste]
-            for i in range(self.dim):
+            for i in range(self.number_dimensions):
                 self._position[i] = self._position[i][where(teste)]
-
-        def stack(self):
-            # TODO: converter este método para uso direto em add
-            self.position = array([self._position[0]])
-            self.velocity = array([self._velocity[0]])
-            for i in range(1, self.dim):
-                self.position = vstack((self.position, self._position[i]))
-                self.velocity = vstack((self.velocity, self._velocity[i]))
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
         Class that uses particles in an optimization loop
         Parameters
         ----------
-        myfunction: function
+        myfunction : function
             result of the function at a given point
-        pso_version: str or int
+        pso_version : str or int
             version of pso to be used for optimization
-        bounds: array with shape (nd x 2)
+        bounds : array with shape (nd x 2)
             position restriction
-        num_part: int
+        num_part : int
             number of particles
-        maxiter: int
+        maxiter : int
             maximum number of interactions
-        **kwargs:
+        **kwargs :
             c1 : int
                 cognitive constant
             c2 : int
@@ -328,7 +321,10 @@ class PSO:
         self.function_cut : float
             fitness value for cutting the graph
         vel_restraint : float
-            value by which the velocity will be multiplied when the particle crosses the edges
+            value by which the velocity will be multiplied when the particle crosses the edges.
+            A small value is recommended so that the particle is not bouncing from one end to the
+            other, and it must be negative so that the particle follows the path opposite to the
+            end it is attached to.
         self.maxiter: int
             maximum number of interactions
         sig_evolution_value : float
@@ -366,8 +362,8 @@ class PSO:
                     raise TypeError("The variable 'wi' must be a number")
                 elif type(kwargs.get("wf")) != float:
                     raise TypeError("The variable 'wf' must be a number.")
-                elif type(kwargs.get("initial_swarm")) != str:
-                    raise TypeError("The variable 'initial_swarm' must be a string.")
+                # elif type(kwargs.get("initial_swarm")) != str:
+                #     raise TypeError("The variable 'initial_swarm' must be a string.")
                 elif type(kwargs.get("vel_restraint")) != float:
                     raise TypeError("The variable 'vel_restraint' must be a number.")
                 elif type(kwargs.get("sig_evolution_value")) != float:
@@ -380,12 +376,15 @@ class PSO:
                    sig_evolution_value=kwargs.get("sig_evolution_value"), significant_evolution=kwargs.get("significant_evolution"))
 
         number_dimensions = bounds.shape[0]
-        #todo fit_gbest sem valor incial
-        self.fit_gbest = 1e10
+        self.fit_gbest = float()
         self.gbest = []
         self.swarm = array([])
         self.function_cut = kwargs.get("function_cut")
         self.vel_restraint = kwargs.get("vel_restraint")
+        self.inter = 0
+        self.maxiter = maxiter if maxiter is not None else 1e3
+        self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
+        self.sig_evolution_value = kwargs.get("sig_evolution_value") if kwargs.get("sig_evolution_value") is not None else 1e-6
 
         if kwargs.get("initial_swarm") == 'Sobol':
             from scipy.stats import qmc
@@ -405,29 +404,25 @@ class PSO:
             else:
                 peso_velocity = None
                 peso_position = None
-            self.swarm = append(self.swarm, Particle(number_dimensions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
+            self.swarm = append(self.swarm, Particle(myfunction, number_dimensions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
 
-        self.history = self.history(number_dimensions)
+        self.history = self.history(number_dimensions, self.swarm, num_part)
         # TODO: inicializar histórico aqui, com as primeiras posições/velocidades das partículas
 
-        k = 0 # k
-        self.inter = 0
-        self.maxiter = maxiter if maxiter is not None else 1e3
-        self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
-        self.sig_evolution_value = kwargs.get("sig_evolution_value") if kwargs.get("sig_evolution_value") is not None else 1e-6
+        k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             for j in range(0, num_part):
-                self.swarm[j].evaluate(myfunction, self.inter)
+                self.swarm[j].evaluate(self.inter)
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+
+                if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
+                    self.gbest = list(self.swarm[j].position)
+                    self.fit_gbest = float(self.swarm[j].fit)
 
                 # determines if the current particle is the best (globally)
                 if abs(self.swarm[j].fit-self.fit_gbest) < self.sig_evolution_value:
                     k += 1
-
-                if self.swarm[j].fit < self.fit_gbest:
-                    self.gbest = list(self.swarm[j].position)
-                    self.fit_gbest = float(self.swarm[j].fit)
 
                 if pso_version == 'SPSO':
                     self.swarm[j].spso(self.gbest)
@@ -439,10 +434,11 @@ class PSO:
                     self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
                 else:
                     raise NameError("Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
-                self.swarm[j].update_position(bounds, self.vel_restraint)
+                self.swarm[j].update_position(self.vel_restraint)
             self.inter += 1
 
         if self.function_cut is not None:
             self.history.region(self.function_cut)
+            self.inter = int((shape(self.history.fitness)[0])/num_part)
         self.history.stack()
         # ----------------------------------------------------------------------------------------
