@@ -26,8 +26,8 @@ pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, 
 print(pso.gbest)
 print(pso.fit_gbest)
 
-graph = Graph(pso.history.position, pso.history.fitness, pso.history.velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
-# graph.pos_fit_3d()
+graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
+graph.pos_fit_3d()
 graph.positions()
 # graph.gif()
 graph.pos_fit_2d()

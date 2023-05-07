@@ -98,12 +98,12 @@ class Particle:
         peso_vel = kwargs.get("peso_vel") if kwargs.get("peso_vel") is not None else diag(random.rand(number_dimensions))
         peso_pos = kwargs.get("peso_pos") if kwargs.get("peso_pos") is not None else diag(random.rand(number_dimensions))
         self.bounds = bounds
+        self.__function = myfunction
         self.pbest = array([])
+        self.fit = ([])
         self.fit_best = float()
-        self.fit = array([])
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
-        self.__function = myfunction
 
 
     def evaluate(self, inter):
@@ -248,10 +248,11 @@ class PSO:
             self.number_dimensions = number_dimensions
             self._position = reshape(swarm[0].position, (self.number_dimensions, 1))
             self._velocity = reshape(swarm[0].velocity, (self.number_dimensions, 1))
-            self.fitness = swarm[0].fit
+            self._fitness = array(swarm[0].fit)
             for i in range(1, num_part):
                 self._position = hstack((self._position, reshape(swarm[i].position, (self.number_dimensions, 1))))
                 self._velocity = hstack((self._velocity, reshape(swarm[i].velocity, (self.number_dimensions, 1))))
+                self._fitness = append(self._fitness, swarm[i].fit)
 
             # receber swarm
             # i = 0
@@ -261,10 +262,9 @@ class PSO:
 
         def add(self, position, fitness, velocity):
             # TODO: trabalhar com array > hstack > Para isso fazer reshape (nd x 1)
-            for i in range(0, self.number_dimensions):
-                self._position[i] = hstack((self._position[i], position[i]))
-                self._velocity[i] = hstack((self._velocity[i], velocity[i]))
-            self.fitness = append(self.fitness, fitness)
+            self._position = hstack((self._position, reshape(position, (self.number_dimensions, 1))))
+            self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
+            self._fitness = append(self._fitness, fitness)
 
         def region(self, function_cut):
             fmax = full(shape(self.fitness), function_cut)
@@ -406,6 +406,7 @@ class PSO:
                 peso_position = None
             self.swarm = append(self.swarm, Particle(myfunction, number_dimensions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
+            self.swarm[i].evaluate(0)
 
         self.history = self.history(number_dimensions, self.swarm, num_part)
         # TODO: inicializar histórico aqui, com as primeiras posições/velocidades das partículas
@@ -413,9 +414,6 @@ class PSO:
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             for j in range(0, num_part):
-                self.swarm[j].evaluate(self.inter)
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-
                 if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
@@ -435,10 +433,12 @@ class PSO:
                 else:
                     raise NameError("Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
                 self.swarm[j].update_position(self.vel_restraint)
+                self.swarm[j].evaluate(self.inter)
+
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
             self.inter += 1
 
         if self.function_cut is not None:
             self.history.region(self.function_cut)
             self.inter = int((shape(self.history.fitness)[0])/num_part)
-        self.history.stack()
         # ----------------------------------------------------------------------------------------
