@@ -1,39 +1,33 @@
+# -*- coding: utf-8 -*-
 """
 Example of main program to be used with PSO
-@author: Renilton
+@author: Daniel
 """
-from PSO import PSO  # Importing the PSO class
-from Graphics import Graph  # Importing the Graphics
-from Modelo_benchmark import modelo_benchmark  # Importing the function to be minimized
-from numpy import array
+from matplotlib import use
+use('Agg')
 
-function = 'Exponencial'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
-pso_version = 'PSO-WL'  # SPSO, PSO-WL, PSO-WR pso_chongpeng
-bounds = array([[-10, 10], [-10, 10], [-10, 10]])  # input limits [(x_min,x_max)]
-number_particles = 30  # amount of particles
-interactions = 500  # amount of interactions that each particle will make
-pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, number_particles, interactions,
-          c1=float(1),  # cognitive constant
-          c2=float(2),  # social constant
-          wi=float(0.9),  # initial inertia
-          wf=float(0.4),  # final inertia
-          initial_swarm=None,  # Pattern, Sobol or None
-          function_cut=None,  # fit restriction
-          vel_restraint=float(-0.01),  # velocity restraint
-          sig_evolution_value=float(1e-6),  # significant evolution
-          significant_evolution=int(1e3))  # stopping criterion
+from PSO import PSO # Importing the PSO class
+from Modelo_benchmark import Modelo # Importing the function to be minimized
+from time import time
 
-print(pso.gbest)
-print(pso.fit_gbest)
+t1 = time()
 
-graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
-graph.pos_fit_3d()
-graph.positions()
-# graph.gif()
-graph.pos_fit_2d()
-graph.int_fitness()
-graph.int_fit_average()
-graph.int_fit_sd()
-graph.int_velocity()
-graph.int_vel_average()
-graph.int_vel_sd()
+sup = [100,100] # maximum value for the parameters
+inf = [-100,-100] # minimum value for the parameters
+
+args_model=['ackley'] # In this example, the Modelo class needs another argument: the name of the function to be minimized
+# PSO Algorithm executed with decreasing inercia weight from 0.9 to 0.4; acceleration factors constant and equal to default values of 2; 30 particles and 200 iterations.
+Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'PSO','inercia':'TVIW-Adaptive-vel','aceleracao':'TVAC','restricao':True,'parada':['itmax']},
+Num_particulas=30,itmax=500,w=[1.0,0.1],args_model=args_model,NP=2)
+#Otimizacao = PSO(sup,inf,{'busca':'Otimo','algoritmo':'HPSO','gbest':'Particula','parada':'itmax','inercia':'Constante'},\
+# Num_particulas=30,itmax=100,w=[0.9,0.4],args_model=args_model)
+Otimizacao.Busca(Modelo,printit=True) # Do the search
+Otimizacao.Relatorios(resumos_txt=True) # Printing results in the same folder as txt files
+#Otimizacao.Graficos(Nome_param=[r'$\theta_{}$'.format(i) for i in xrange(len(sup))],FO2a2=True) # Creating performance graphs in the same folder, including the objective function in 3d (FO2a2=True)
+# To create movie frames uncomment the line below
+#Otimizacao.Movie(Nome_param=[r'$\theta_1$',r'$\theta_2$'],Unid_param=['admin','admin']) # Creating movie frames
+
+# Printing the results:
+print 'Optimum point', Otimizacao.gbest # optimum point
+print 'Best Fitness' , Otimizacao.best_fitness # objective function in the optimum point
+print 'Time', time()-t1
