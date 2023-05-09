@@ -52,7 +52,7 @@ class Particle:
             diagonal array with values from a distribution or random
         peso_pos : array with shape (nd x nd)
             diagonal array with values from a distribution or random
-        pbest : array
+        pbest : array with shape (1 x 1)
             the best individual position
         fit_best : int
             the lowest individual value
@@ -219,31 +219,35 @@ class PSO:
     @property
     def available_methods(self):
         return ['SPSO', 'PSO-WL', 'PSO-WR', 'PSO-Chonpeng']
-    # @property
-    # def fit_gbest(self):
-    #     return {self.fit_gbest}
+    @property
+    def fitness_gbest(self):
+        return self.fit_gbest
+    @property
+    def global_best(self):
+        return self.gbest
 
-    # TODO: mapear novas propriedades
     class history:
         def __init__(self, number_dimensions, swarm, num_part):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
             Parameters
             ----------
-            dim : int
+            number_dimensions : int
                 number of dimensions
             Attributes
             ----------
-            self._position : array with shape (1 x nd)
+            self._position : array with shape (nd x np*inter)
                 an array to record the positional coordinates of each particle in each interaction
-            self.fitness : array with shape (1 x 1)
-                an array to record the fitness of each particle in each interaction
-            self._velocity : array  with shape (1 x nd)
+            self._velocity : array  with shape (nd x np*inter)
                 an array to record the velocity coordinates of each particle in each interaction
+            self._fitness : array with shape (1 x np*inter)
+                an array to record the fitness of each particle in each interaction
             Methods
             -------
             add(self, position, fitness, velocity)
                 Makes an array with all the data for each parameter
+            region(self, function_cut)
+                selects the graph below the fit value that was given for the cut
             """
             self.number_dimensions = number_dimensions
             self._position = reshape(swarm[0].position, (self.number_dimensions, 1))
@@ -253,12 +257,6 @@ class PSO:
                 self._position = hstack((self._position, reshape(swarm[i].position, (self.number_dimensions, 1))))
                 self._velocity = hstack((self._velocity, reshape(swarm[i].velocity, (self.number_dimensions, 1))))
                 self._fitness = append(self._fitness, swarm[i].fit)
-
-            # receber swarm
-            # i = 0
-            # self._position = reshape(swarm[0].position,(nd,1))
-            # for i in range(1,num_part):
-            #   self._position = hstack(self._position,reshape(swarm[i].position,(self.number_dimensions,1)))
 
         def add(self, position, fitness, velocity):
             # TODO: trabalhar com array > hstack > Para isso fazer reshape (nd x 1)
@@ -316,7 +314,7 @@ class PSO:
             best group value
         self.gbest : list
             best group position
-        self.swarm : array
+        self.swarm : array of particles with shape (1 x np)
             establishes the swarm
         self.function_cut : float
             fitness value for cutting the graph
@@ -390,15 +388,19 @@ class PSO:
             from scipy.stats import qmc
             init_sobol_vel = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
             init_sobol_pos = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
-        elif kwargs.get("initial_swarm") == 'Pattern':
-            init_pattern_pos = array([linspace(0, 1, num_part), linspace(0, 1, num_part), linspace(1, 0, num_part), linspace(1, 0, num_part)])
-            init_pattern_vel = array([linspace(0, 0.5, num_part), linspace(0.5, 0, num_part), linspace(0, 0.5, num_part), linspace(0.5, 0, num_part)])
+        if kwargs.get("initial_swarm") == 'Pattern':
+            init_pattern_vel = linspace(1, 0, num_part)
+            for i in range(1, number_dimensions):
+                v = linspace((1-(i*0.1)), 0, num_part)
+                init_pattern_vel = vstack((init_pattern_vel, v))
+            p = linspace(0, 1, num_part),
+            init_pattern_pos = array(p*number_dimensions)
 
         for i in range(0, num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
                 peso_velocity = diag(init_sobol_vel[i, :])
                 peso_position = diag(init_sobol_pos[i, :])
-            elif kwargs.get("initial_swarm") == 'Pattern':
+            if kwargs.get("initial_swarm") == 'Pattern':
                 peso_velocity = diag(init_pattern_vel[:number_dimensions, i])
                 peso_position = diag(init_pattern_pos[:number_dimensions, i])
             else:
@@ -441,4 +443,5 @@ class PSO:
         if self.function_cut is not None:
             self.history.region(self.function_cut)
             self.inter = int((shape(self.history.fitness)[0])/num_part)
+
         # ----------------------------------------------------------------------------------------

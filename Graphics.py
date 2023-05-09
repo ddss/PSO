@@ -86,7 +86,7 @@ class Graph:
                     mp.tricontourf(self.posit[i], self.posit[(j + 1)], self.fit, levels=levels, alpha=0.7)
                     mp.colorbar()
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
-                    mp.plot(self.optimal_point[i], self.optimal_point[j+i], '.', color='red', label='optimal point')
+                    mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
                     mp.show()
 
@@ -185,7 +185,10 @@ class Graph:
         mp.figure()
         mp.xlabel('Interactions')
         mp.ylabel('Velocity standart desviation')
-        sd = ([[], [], []])
+        w = [],
+        sd = ([])
+        for i in range(0, self.dim):
+            sd += w
         aux = zeros(self.num_part)
         for i in range(0, self.dim):
             for j in range(0, self.inter):
