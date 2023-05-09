@@ -12,8 +12,9 @@ import matplotlib.patches as mpatches
 class Graph:
     def __init__(self, coordinates, fit, vel, bounds, optimal_point, optimal_fit, inter, num_part):
         """
-        Class used to define the particles
-        Attributes
+        Class that generates the graphics
+
+        Parameters
         ----------
         coordinates : array
             a list with the coordinates of each particle in each interaction
@@ -21,20 +22,58 @@ class Graph:
             a list with the fitness of each particle in each interaction
         vel : array
             a list with the velocity of each particle in each interaction
-        vel_ave : array
-            a list with the velocity average of each particle in each interaction
-        fit_ave: array
-            a list with the fitness average of each particle in each interaction
-        vel_desv: array
-            a list with the standart desviation of velocity average
-        fit_desv: array
-            a list with the standart desviation of fitness average
         bounds: array with shape (nd x 2)
             position restriction
         optimal_point: float
             the optimal point
         optimal_fit: float
             the fitness of the optimal point
+        inter
+            number of interactions
+        num_part
+            number of particles
+
+        Attributes
+        ----------
+        posit : array
+            a list with the coordinates of each particle in each interaction
+        fit : array
+            a list with the fitness of each particle in each interaction
+        vel : array
+            a list with the velocity of each particle in each interaction
+        dim: int
+            number of dimensions
+        optimal_point: float
+            the optimal point
+        optimal_fit: float
+            the fitness of the optimal point
+        inter: int
+            number of interactions
+        num_part: int
+            number of particles
+
+        Methods
+        -------
+        pos_fit_3d(self)
+            Evaluate the objetive function and record its value
+        positions(self)
+            Generates a 3-dimensional graph in plotly, the fit versus two by two nd positions
+        pos_fit_2d(self)
+            Generates a 2-dimensional plot in matplotlib of the fit versus one in one positions versus the fit
+        int_fitness(self)
+            Generates a 2-dimensional plot in matplotlib of the fit versus interactions
+        int_fit_average(self)
+            Generates a 2-dimensional plot in matplotlib of the fit average of each interaction versus interactions
+        int_fit_sd(self)
+            Generates a 2-dimensional plot in matplotlib of the fit standart desviation of each interaction versus interactions
+        int_velocity(self)
+            Generates a 2-dimensional plot in matplotlib of the velocity versus interactions
+        int_vel_average(self)
+            Generates a 2-dimensional plot in matplotlib of the velocity average of each interaction versus interactions
+        int_vel_sd(self)
+            Generates a 2-dimensional plot in matplotlib of the velocity standart desviation of each interaction versus interactions
+
+
         """
         self.posit = coordinates
         self.fit = fit
@@ -46,6 +85,7 @@ class Graph:
         self.num_part = num_part
 
 
+    # Position 1 X Positions 2 X Fitness
     def pos_fit_3d(self):
         label = ['x{}'.format(i+1) for i in range(self.dim)]
         for i in range(self.dim - 1):
@@ -90,24 +130,24 @@ class Graph:
                     mp.legend()
                     mp.show()
 
-    def gif(self):
-        for i in range(0, 30):
-            mp.figure()
-            mp.title('Interaction {}'.format(i+1))
-            mp.xlabel(r'$x_{}$'.format(1))
-            mp.ylabel(r'$x_{}$'.format(2))
-            levels = linspace(self.fit.min(), self.fit.max(), 10)
-            mp.tricontourf(self.posit[0], self.posit[1], self.fit, levels=levels, alpha=0.5)
-            mp.colorbar()
-            self.tick = self.posit[0, (1000*i):(1000*(i+1))]
-            self.tick2 = self.posit[1, (1000*i):(1000*(i+1))]
-            mp.plot(self.tick, self.tick2, '.', label=r'$x_{} vs x_{}$'.format(1,2), color='#202020')
-            mp.plot(self.optimal_point[0], self.optimal_point[1], '.', color='red', label=r'$optimal point$')
-            #mp.legend()
-            mp.xlim(-10, 10)
-            mp.ylim(-10, 10)
-            mp.show()
-
+    # GIF
+    # def gif(self):
+    #     for i in range(0, 30):
+    #         mp.figure()
+    #         mp.title('Interaction {}'.format(i+1))
+    #         mp.xlabel(r'$x_{}$'.format(1))
+    #         mp.ylabel(r'$x_{}$'.format(2))
+    #         levels = linspace(self.fit.min(), self.fit.max(), 10)
+    #         mp.tricontourf(self.posit[0], self.posit[1], self.fit, levels=levels, alpha=0.5)
+    #         mp.colorbar()
+    #         self.tick = self.posit[0, (1000*i):(1000*(i+1))]
+    #         self.tick2 = self.posit[1, (1000*i):(1000*(i+1))]
+    #         mp.plot(self.tick, self.tick2, '.', label=r'$x_{} vs x_{}$'.format(1,2), color='#202020')
+    #         mp.plot(self.optimal_point[0], self.optimal_point[1], '.', color='red', label=r'$optimal point$')
+    #         #mp.legend()
+    #         mp.xlim(-10, 10)
+    #         mp.ylim(-10, 10)
+    #         mp.show()
 
     # Positions X Fitness
     def pos_fit_2d(self):
