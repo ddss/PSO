@@ -3,11 +3,11 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import array, append, random, diag, dot, shape, where, reshape, hstack, vstack, full, linspace, sqrt, ndarray
+from numpy import array, append, random, diag, dot, shape, where, reshape, hstack, vstack, \
+    full, linspace, sqrt, ndarray, copy
 import plotly.io as pio
 
 pio.renderers.default = 'browser'
-
 
 # --- MAIN ---------------------------------------------------------------------+
 class Particle:
@@ -52,9 +52,9 @@ class Particle:
             diagonal array with values from a distribution or random
         peso_pos : array with shape (nd x nd)
             diagonal array with values from a distribution or random
-        pbest : array with shape (1 x 1)
+        pbest : array with shape (1 x nd)
             the best individual position
-        fit_best : int
+        fit_best : float
             the lowest individual value
         fit : list
             individual value
@@ -219,14 +219,9 @@ class PSO:
     @property
     def available_methods(self):
         return ['SPSO', 'PSO-WL', 'PSO-WR', 'PSO-Chonpeng']
-    @property
-    def fitness_gbest(self):
-        return self.fit_gbest
-    @property
-    def global_best(self):
-        return self.gbest
 
     class history:
+
         def __init__(self, number_dimensions, swarm, num_part):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
@@ -265,9 +260,9 @@ class PSO:
             self._fitness = append(self._fitness, fitness)
 
         def region(self, function_cut):
-            fmax = full(shape(self.fitness), function_cut)
-            teste = (self.fitness <= fmax)
-            self.fitness = self.fitness[teste]
+            fmax = full(shape(self._fitness), function_cut)
+            teste = (self._fitness <= fmax)
+            self._fitnessC = self._fitness[teste]
             for i in range(self.number_dimensions):
                 self._position[i] = self._position[i][where(teste)]
 
@@ -415,14 +410,18 @@ class PSO:
 
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
+            gbest_previous = copy(self.fit_gbest)
+
+            # determines if the current particle is the best (globally)
+            if abs(gbest_previous - self.fit_gbest) < self.sig_evolution_value:
+                k += 1
+            else:
+                k = 0
+
             for j in range(0, num_part):
                 if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
-
-                # determines if the current particle is the best (globally)
-                if abs(self.swarm[j].fit-self.fit_gbest) < self.sig_evolution_value:
-                    k += 1
 
                 if pso_version == 'SPSO':
                     self.swarm[j].spso(self.gbest)

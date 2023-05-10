@@ -8,10 +8,6 @@ import os
 from mpl_toolkits.mplot3d import Axes3D, proj3d
 from matplotlib.patches import FancyArrowPatch
 
-
-
-
-
 # -------------------------------------------------------------------------------
 # Subrotinas e classes auxiliares
 # -------------------------------------------------------------------------------
