@@ -254,7 +254,6 @@ class PSO:
                 self._fitness = append(self._fitness, swarm[i].fit)
 
         def add(self, position, fitness, velocity):
-            # TODO: trabalhar com array > hstack > Para isso fazer reshape (nd x 1)
             self._position = hstack((self._position, reshape(position, (self.number_dimensions, 1))))
             self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
             self._fitness = append(self._fitness, fitness)
@@ -262,9 +261,8 @@ class PSO:
         def region(self, function_cut):
             fmax = full(shape(self._fitness), function_cut)
             teste = (self._fitness <= fmax)
-            self._fitnessC = self._fitness[teste]
-            for i in range(self.number_dimensions):
-                self._position[i] = self._position[i][where(teste)]
+            self._fitness = self._fitness[teste]
+            self._position = self._position[:, teste]
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -341,27 +339,29 @@ class PSO:
                 """
                 if type(bounds) != ndarray:
                     raise TypeError("The variable 'bounds' must be an array")
-                elif type(num_part) != int:
+                if type(num_part) != int:
                     raise TypeError("The variable 'num_part' must be an integer.")
-                elif type(maxiter) != int:
+                if type(maxiter) != int:
                     raise TypeError("The variable 'maxiter' must be an integer.")
-                elif shape(bounds)[1] != 2:
+                if shape(bounds)[1] != 2:
                     raise TypeError("The variable 'bounds' must have 2 columns")
-                elif type(kwargs.get("c1")) != float:
+                if type(kwargs.get("c1")) != float and kwargs.get("c1") is not None:
                     raise TypeError("The variable 'c1' must be a number.")
-                elif type(kwargs.get("c2")) != float:
+                if type(kwargs.get("c2")) != float and kwargs.get("c2") is not None:
                     raise TypeError("The variable 'c2' must be a number.")
-                elif type(kwargs.get("wi")) != float:
+                if type(kwargs.get("wi")) != float and kwargs.get("wi") is not None:
                     raise TypeError("The variable 'wi' must be a number")
-                elif type(kwargs.get("wf")) != float:
+                if type(kwargs.get("wf")) != float and kwargs.get("wf") is not None:
                     raise TypeError("The variable 'wf' must be a number.")
-                # elif type(kwargs.get("initial_swarm")) != str:
-                #     raise TypeError("The variable 'initial_swarm' must be a string.")
-                elif type(kwargs.get("vel_restraint")) != float:
+                if type(kwargs.get("initial_swarm")) != str and kwargs.get("initial_swarm") is not None:
+                    raise TypeError("The variable 'initial_swarm' must be a string.")
+                if type(kwargs.get("function_cut")) != float and kwargs.get("function_cut") is not None:
+                    raise TypeError("The variable 'initial_swarm' must be a number.")
+                if type(kwargs.get("vel_restraint")) != float and kwargs.get("vel_restraint") is not None:
                     raise TypeError("The variable 'vel_restraint' must be a number.")
-                elif type(kwargs.get("sig_evolution_value")) != float:
+                if type(kwargs.get("sig_evolution_value")) != float and kwargs.get("sig_evolution_value") is not None:
                     raise TypeError("The variable 'sig_evolution_value' must be a number.")
-                elif type(kwargs.get("significant_evolution")) != int:
+                if type(kwargs.get("significant_evolution")) != int and kwargs.get("significant_evolution") is not None:
                     raise TypeError("The variable 'significant_evolution' must be an integer.")
 
         validation(bounds, num_part, maxiter, c1=kwargs.get("c1"), c2=kwargs.get("c2"), wi=kwargs.get("wi"), wf=kwargs.get("wf"),
@@ -373,7 +373,7 @@ class PSO:
         self.gbest = []
         self.swarm = array([])
         self.function_cut = kwargs.get("function_cut")
-        self.vel_restraint = kwargs.get("vel_restraint")
+        self.vel_restraint = kwargs.get("vel_restraint") if kwargs.get("vel_restraint") is not None else -0.01
         self.inter = 0
         self.maxiter = maxiter if maxiter is not None else 1e3
         self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
@@ -441,6 +441,6 @@ class PSO:
 
         if self.function_cut is not None:
             self.history.region(self.function_cut)
-            self.inter = int((shape(self.history.fitness)[0])/num_part)
+            self.inter = int((shape(self.history._fitness)[0])/num_part)
 
         # ----------------------------------------------------------------------------------------
