@@ -10,7 +10,7 @@ from numpy import array
 function = 'Rastrigin'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
 pso_version = 'PSO-WL'  # SPSO, PSO-WL, PSO-WR pso_chongpeng
 bounds = array([[-10, 10], [-10, 10]])  # input limits [(x_min,x_max)]
-number_particles = 30  # amount of particles
+number_particles = 100  # amount of particles
 interactions = 500  # amount of interactions that each particle will make
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, number_particles, interactions,
           c1=float(1),  # cognitive constant
@@ -21,15 +21,15 @@ pso = PSO(lambda x: modelo_benchmark(x, function, bounds), pso_version, bounds, 
           function_cut=None,  # fit restriction
           vel_restraint=float(-0.01),  # velocity restraint
           sig_evolution_value=float(1e-6),  # significant evolution
-          significant_evolution=int(300))  # stopping criterion
+          significant_evolution=int(300),  # stopping criterion
+          map=False)
 
 print(pso.gbest)
 print(pso.fit_gbest)
 
 graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, number_particles)
-# graph.pos_fit_3d()
+graph.pos_fit_3d()
 graph.positions()
-#graph.gif()
 graph.pos_fit_2d()
 graph.int_fitness()
 graph.int_fit_average()

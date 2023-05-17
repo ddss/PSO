@@ -130,24 +130,6 @@ class Graph:
                     mp.legend()
                     mp.show()
 
-    # GIF
-    # def gif(self):
-    #     for i in range(0, 30):
-    #         mp.figure()
-    #         mp.title('Interaction {}'.format(i+1))
-    #         mp.xlabel(r'$x_{}$'.format(1))
-    #         mp.ylabel(r'$x_{}$'.format(2))
-    #         levels = linspace(self.fit.min(), self.fit.max(), 10)
-    #         mp.tricontourf(self.posit[0], self.posit[1], self.fit, levels=levels, alpha=0.5)
-    #         mp.colorbar()
-    #         self.tick = self.posit[0, (1000*i):(1000*(i+1))]
-    #         self.tick2 = self.posit[1, (1000*i):(1000*(i+1))]
-    #         mp.plot(self.tick, self.tick2, '.', label=r'$x_{} vs x_{}$'.format(1,2), color='#202020')
-    #         mp.plot(self.optimal_point[0], self.optimal_point[1], '.', color='red', label=r'$optimal point$')
-    #         #mp.legend()
-    #         mp.xlim(-10, 10)
-    #         mp.ylim(-10, 10)
-    #         mp.show()
 
     # Positions X Fitness
     def pos_fit_2d(self):

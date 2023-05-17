@@ -197,7 +197,7 @@ class Particle:
         vel_social = self.c2 * r2 * (g_best - self.position)
         self.velocity = w * self.velocity + vel_cognitive + vel_social
 
-    def update_position(self, vel_restraint=-0.01):
+    def update_position(self, vel_restraint):
         """
         Update particle position
 
@@ -261,6 +261,7 @@ class PSO:
         def region(self, function_cut):
             fmax = full(shape(self._fitness), function_cut)
             teste = (self._fitness <= fmax)
+            self.previous_fitness = self._fitness
             self._fitness = self._fitness[teste]
             self._position = self._position[:, teste]
 
@@ -378,6 +379,7 @@ class PSO:
         self.maxiter = maxiter if maxiter is not None else 1e3
         self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
         self.sig_evolution_value = kwargs.get("sig_evolution_value") if kwargs.get("sig_evolution_value") is not None else 1e-6
+        map = kwargs.get("map")
 
         if kwargs.get("initial_swarm") == 'Sobol':
             from scipy.stats import qmc
@@ -406,7 +408,6 @@ class PSO:
             self.swarm[i].evaluate(0)
 
         self.history = self.history(number_dimensions, self.swarm, num_part)
-        # TODO: inicializar histórico aqui, com as primeiras posições/velocidades das partículas
 
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
@@ -419,7 +420,12 @@ class PSO:
                 k = 0
 
             for j in range(0, num_part):
-                if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
+                if map:
+                    if self.inter == 0 or all(abs(bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(abs(bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
+                        if all(bounds[:, 0] != self.swarm[j].position) and all(bounds[:, 1] != self.swarm[j].position):
+                            self.gbest = list(self.swarm[j].position)
+                            self.fit_gbest = float(self.swarm[j].fit)
+                elif self.swarm[j].fit < self.fit_gbest or self.inter == 0:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
 
