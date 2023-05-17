@@ -222,6 +222,14 @@ class PSO:
 
     class history:
 
+        @property
+        def fitness_region(self):
+            return self._fitness[self.__test_region]
+
+        @property
+        def position_region(self):
+            return self._position[:, self.__test_region]
+
         def __init__(self, number_dimensions, swarm, num_part):
             """
             Class that saves all positions, velocities, fitness and average velocities of each particle
@@ -258,12 +266,10 @@ class PSO:
             self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
             self._fitness = append(self._fitness, fitness)
 
+        #Todo: salvar as posições e fitnessda região em variáveis separadas.
         def region(self, function_cut):
             fmax = full(shape(self._fitness), function_cut)
-            teste = (self._fitness <= fmax)
-            self.previous_fitness = self._fitness
-            self._fitness = self._fitness[teste]
-            self._position = self._position[:, teste]
+            self.__test_region = (self._fitness <= fmax)
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -419,6 +425,7 @@ class PSO:
             else:
                 k = 0
 
+            # Separar o método map
             for j in range(0, num_part):
                 if map:
                     if self.inter == 0 or all(abs(bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(abs(bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
