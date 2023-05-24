@@ -4,10 +4,11 @@
 """
 
 from numpy import array, append, random, diag, dot, shape, where, reshape, hstack, vstack, \
-    full, linspace, sqrt, ndarray, copy
+    full, linspace, sqrt, ndarray, copy, argmin, argmax
 import plotly.io as pio
 
 pio.renderers.default = 'browser'
+
 
 # --- MAIN ---------------------------------------------------------------------+
 class Particle:
@@ -105,8 +106,7 @@ class Particle:
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
 
-
-    def evaluate(self, inter):
+    def evaluate_min(self, inter):
         """
         Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
         Parameters
@@ -115,6 +115,17 @@ class Particle:
         """
         self.fit = self.__function(self.position)
         if self.fit < self.fit_best or inter == 0:
+            self.pbest = self.position
+            self.fit_best = self.fit
+    def evaluate_max(self, inter):
+        """
+        Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
+        Parameters
+        ----------
+        inter: interaction number
+        """
+        self.fit = self.__function(self.position)
+        if self.fit > self.fit_best or inter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
 
@@ -214,6 +225,7 @@ class Particle:
         self.position[testemax] = self.bounds[:, 1][testemax]
         self.position[testemin] = self.bounds[:, 0][testemin]
 
+
 class PSO:
 
     @property
@@ -252,6 +264,7 @@ class PSO:
             region(self, function_cut)
                 selects the graph below the fit value that was given for the cut
             """
+            self.num_part = num_part
             self.number_dimensions = number_dimensions
             self._position = reshape(swarm[0].position, (self.number_dimensions, 1))
             self._velocity = reshape(swarm[0].velocity, (self.number_dimensions, 1))
@@ -266,10 +279,13 @@ class PSO:
             self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
             self._fitness = append(self._fitness, fitness)
 
-        #Todo: salvar as posições e fitnessda região em variáveis separadas.
-        def region(self, function_cut):
-            fmax = full(shape(self._fitness), function_cut)
-            self.__test_region = (self._fitness <= fmax)
+        def region(self, function_cut, sense):
+            cutter = full(shape(self._fitness), function_cut)
+            if sense == 'up':
+                self.__test_region = (self._fitness >= cutter)
+            elif sense == 'down':
+                self.__test_region = (self._fitness <= cutter)
+            self.inter = int((shape(self.fitness_region)[0])/self.num_part)
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
@@ -382,10 +398,12 @@ class PSO:
         self.function_cut = kwargs.get("function_cut")
         self.vel_restraint = kwargs.get("vel_restraint") if kwargs.get("vel_restraint") is not None else -0.01
         self.inter = 0
+        self.bounds = bounds
+        self.num_part = num_part
+        self.pso_version = pso_version
         self.maxiter = maxiter if maxiter is not None else 1e3
         self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
         self.sig_evolution_value = kwargs.get("sig_evolution_value") if kwargs.get("sig_evolution_value") is not None else 1e-6
-        map = kwargs.get("map")
 
         if kwargs.get("initial_swarm") == 'Sobol':
             from scipy.stats import qmc
@@ -409,12 +427,12 @@ class PSO:
             else:
                 peso_velocity = None
                 peso_position = None
-            self.swarm = append(self.swarm, Particle(myfunction, number_dimensions, bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
+            self.swarm = append(self.swarm, Particle(myfunction, number_dimensions, self.bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
-            self.swarm[i].evaluate(0)
+            self.swarm[i].evaluate_min(0)
 
         self.history = self.history(number_dimensions, self.swarm, num_part)
-
+    def map_min(self):
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             gbest_previous = copy(self.fit_gbest)
@@ -425,35 +443,141 @@ class PSO:
             else:
                 k = 0
 
-            # Separar o método map
-            for j in range(0, num_part):
-                if map:
-                    if self.inter == 0 or all(abs(bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(abs(bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
-                        if all(bounds[:, 0] != self.swarm[j].position) and all(bounds[:, 1] != self.swarm[j].position):
-                            self.gbest = list(self.swarm[j].position)
-                            self.fit_gbest = float(self.swarm[j].fit)
-                elif self.swarm[j].fit < self.fit_gbest or self.inter == 0:
+            for j in range(0, self.num_part):
+                if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
 
-                if pso_version == 'SPSO':
+                if self.pso_version == 'SPSO':
                     self.swarm[j].spso(self.gbest)
-                elif pso_version == 'PSO-WL':
+                elif self.pso_version == 'PSO-WL':
                     self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
-                elif pso_version == 'PSO-WR':
+                elif self.pso_version == 'PSO-WR':
                     self.swarm[j].pso_wr(self.gbest)
-                elif pso_version == 'pso_chongpeng':
+                elif self.pso_version == 'pso_chongpeng':
                     self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
                 else:
                     raise NameError("Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
                 self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate(self.inter)
+                self.swarm[j].evaluate_min(self.inter)
 
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
             self.inter += 1
 
-        if self.function_cut is not None:
-            self.history.region(self.function_cut)
-            self.inter = int((shape(self.history._fitness)[0])/num_part)
+    def map_region(self):
+        k = 0
+        self.inter = 0
+        self.fit_gbest = []
+        while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
+            gbest_previous = copy(self.fit_gbest)
 
+                # determines if the current particle is the best (globally)
+            if abs(gbest_previous - self.fit_gbest) < self.sig_evolution_value:
+                k += 1
+            else:
+                k = 0
+
+            for j in range(0, self.num_part):
+                if self.inter == 0 or all(abs(self.bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(
+                        abs(self.bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
+                    if all(self.bounds[:, 0] != self.swarm[j].position) and all(
+                            self.bounds[:, 1] != self.swarm[j].position):
+                        self.gbest = list(self.swarm[j].position)
+                        self.fit_gbest = float(self.swarm[j].fit)
+
+                if self.pso_version == 'SPSO':
+                    self.swarm[j].spso(self.gbest)
+                elif self.pso_version == 'PSO-WL':
+                    self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
+                elif self.pso_version == 'PSO-WR':
+                    self.swarm[j].pso_wr(self.gbest)
+                elif self.pso_version == 'pso_chongpeng':
+                    self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
+                else:
+                    raise NameError(
+                        "Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
+                self.swarm[j].update_position(self.vel_restraint)
+                self.swarm[j].evaluate_min(self.inter)
+
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+            self.inter += 1
+            n = argmin(self.history._fitness)
+            self.gbest = self.history._position[:, n]
+            self.fit_gbest = self.history._fitness[n]
+    def map_region2(self):
+        k = 0
+        self.inter = 0
+        interval = linspace(0.2, 1.0, num=5)
+        for i in range(0, 5):
+            while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
+                gbest_previous = copy(self.fit_gbest)
+                # determines if the current particle is the best (globally)
+                if abs(gbest_previous - self.fit_gbest) < self.sig_evolution_value:
+                    k += 1
+                else:
+                    k = 0
+
+                for j in range(0, self.num_part):
+                    if self.inter == 0 or all(abs(self.bounds[:, 0] * interval[i]) > abs(self.swarm[j].position)) and all(
+                            abs(self.bounds[:, 1] * interval[i]) > abs(self.swarm[j].position)):
+                        if self.swarm[j].fit > self.fit_gbest or self.inter == 0:
+                            self.gbest = list(self.swarm[j].position)
+                            self.fit_gbest = float(self.swarm[j].fit)
+
+                    if self.pso_version == 'SPSO':
+                        self.swarm[j].spso(self.gbest)
+                    elif self.pso_version == 'PSO-WL':
+                        self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
+                    elif self.pso_version == 'PSO-WR':
+                        self.swarm[j].pso_wr(self.gbest)
+                    elif self.pso_version == 'pso_chongpeng':
+                        self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
+                    else:
+                        raise NameError(
+                            "Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
+                    self.swarm[j].update_position(self.vel_restraint)
+                    self.swarm[j].evaluate_max(self.inter)
+
+                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+                self.inter += 1
+        n = argmin(self.history._fitness)
+        self.gbest = self.history._position[:, n]
+        self.fit_gbest = self.history._fitness[n]
+    def map_max(self):
+        k = 0
+        self.inter = 0
+        while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
+            gbest_previous = copy(self.fit_gbest)
+
+            # determines if the current particle is the best (globally)
+            if abs(gbest_previous - self.fit_gbest) < self.sig_evolution_value:
+                k += 1
+            else:
+                k = 0
+
+            for j in range(0, self.num_part):
+                if self.swarm[j].fit > self.fit_gbest or self.inter == 0:
+                    self.gbest = list(self.swarm[j].position)
+                    self.fit_gbest = float(self.swarm[j].fit)
+
+                if self.pso_version == 'SPSO':
+                    self.swarm[j].spso(self.gbest)
+                elif self.pso_version == 'PSO-WL':
+                    self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
+                elif self.pso_version == 'PSO-WR':
+                    self.swarm[j].pso_wr(self.gbest)
+                elif self.pso_version == 'pso_chongpeng':
+                    self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
+                else:
+                    raise NameError(
+                        "Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
+                self.swarm[j].update_position(self.vel_restraint)
+                self.swarm[j].evaluate_max(self.inter)
+
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+            self.inter += 1
+
+        n = argmax(self.history._fitness)
+        self.gbest = self.history._position[:, n]
+        self.fit_gbest = self.history._fitness[n]
         # ----------------------------------------------------------------------------------------
