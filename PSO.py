@@ -117,6 +117,7 @@ class Particle:
         if self.fit < self.fit_best or inter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
+
     def evaluate_max(self, inter):
         """
         Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
@@ -287,6 +288,7 @@ class PSO:
                 self.__test_region = (self._fitness <= cutter)
             self.inter = int((shape(self.fitness_region)[0])/self.num_part)
 
+    # Valores default: adicionar!
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
         Class that uses particles in an optimization loop
@@ -432,7 +434,8 @@ class PSO:
             self.swarm[i].evaluate_min(0)
 
         self.history = self.history(number_dimensions, self.swarm, num_part)
-    def map_min(self):
+
+    def minimize(self):
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             gbest_previous = copy(self.fit_gbest)
@@ -502,8 +505,11 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
             self.inter += 1
             n = argmin(self.history._fitness)
+            #Todo: não trabalhar com as mesmas variáveis - aqui não é gbest
+            # Inclusive, não trabalhar com self.
             self.gbest = self.history._position[:, n]
             self.fit_gbest = self.history._fitness[n]
+
     def map_region2(self):
         k = 0
         self.inter = 0
@@ -543,41 +549,5 @@ class PSO:
         n = argmin(self.history._fitness)
         self.gbest = self.history._position[:, n]
         self.fit_gbest = self.history._fitness[n]
-    def map_max(self):
-        k = 0
-        self.inter = 0
-        while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
-            gbest_previous = copy(self.fit_gbest)
 
-            # determines if the current particle is the best (globally)
-            if abs(gbest_previous - self.fit_gbest) < self.sig_evolution_value:
-                k += 1
-            else:
-                k = 0
-
-            for j in range(0, self.num_part):
-                if self.swarm[j].fit > self.fit_gbest or self.inter == 0:
-                    self.gbest = list(self.swarm[j].position)
-                    self.fit_gbest = float(self.swarm[j].fit)
-
-                if self.pso_version == 'SPSO':
-                    self.swarm[j].spso(self.gbest)
-                elif self.pso_version == 'PSO-WL':
-                    self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
-                elif self.pso_version == 'PSO-WR':
-                    self.swarm[j].pso_wr(self.gbest)
-                elif self.pso_version == 'pso_chongpeng':
-                    self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
-                else:
-                    raise NameError(
-                        "Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
-                self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate_max(self.inter)
-
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-            self.inter += 1
-
-        n = argmax(self.history._fitness)
-        self.gbest = self.history._position[:, n]
-        self.fit_gbest = self.history._fitness[n]
         # ----------------------------------------------------------------------------------------
