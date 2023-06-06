@@ -113,9 +113,8 @@ class Graph:
                     fig.show()
 
 
-
-    # Positions
-    def positions(self):
+    # Positions coverage area
+    def pos_cov_area(self):
         for i in range(self.dim - 1):
             for j in range(self.dim - 1):
                 if j >= i:
@@ -125,6 +124,17 @@ class Graph:
                     levels = linspace(self.fit.min(), self.fit.max(), 10)
                     mp.tricontourf(self.posit[i], self.posit[(j + 1)], self.fit, levels=levels, alpha=0.7)
                     mp.colorbar()
+                    mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
+                    mp.legend()
+                    mp.show()
+    # Positions
+    def positions(self):
+        for i in range(self.dim - 1):
+            for j in range(self.dim - 1):
+                if j >= i:
+                    mp.figure()
+                    mp.xlabel(r'$x_{}$'.format(i+1))
+                    mp.ylabel(r'$x_{}$'.format(j+2))
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
