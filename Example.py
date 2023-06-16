@@ -3,17 +3,17 @@ Example of main program to be used with PSO
 @author: Renilton
 """
 from PSO import PSO  # Importing the PSO class
-from Graphics import Graph  # Importing the Graphics
+from Graphics import Graph_cut, Graph  # Importing the Graphics
 from Modelo_benchmark import modelo_benchmark  # Importing the function to be minimized
 from numpy import array, shape, argmax, argmin
 
 function = 'Shaffer'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
 bounds = array([[-2, 2], [-2, 2]])
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds),
-          pso_version='PSO-WL',  # SPSO, PSO-WL, PSO-WR pso_chongpeng
+          pso_version=None,  # SPSO, PSO-WL, PSO-WR pso_chongpeng
           bounds=bounds,  # input limits [(x_min,x_max)]
-          num_part=50,  # amount of particles
-          maxiter=500,  # amount of interactions that each particle will make
+          num_part=None,  # amount of particles
+          maxiter=None,  # amount of interactions that each particle will make
           c1=float(1),  # cognitive constant
           c2=float(2),  # social constant
           wi=float(0.9),  # initial inertia
@@ -23,11 +23,10 @@ pso = PSO(lambda x: modelo_benchmark(x, function, bounds),
           sig_evolution_value=float(1e-6),  # significant evolution
           significant_evolution=int(1000))  # stopping criterion
 
+
 pso.minimize()
 print(pso.gbest)
 print(pso.fit_gbest)
-
-# REGION
 graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, pso.num_part)
 graph.pos_fit_3d()
 graph.pos_cov_area()
@@ -40,12 +39,24 @@ graph.int_velocity()
 graph.int_vel_average()
 graph.int_vel_sd()
 
-# MAPPING
-pso.map_region2()
-pso.history.region(1.0, 'down')
-graph2 = Graph(pso.history.position_region, pso.history.fitness_region, None, bounds, pso.gbest,
-               pso.fit_gbest, pso.history.inter, pso.num_part)
-graph2.pos_fit_3d()
-graph2.pos_cov_area()
-graph2.positions()
-graph2.pos_fit_2d()
+pso.history.region(0.8, 'down')
+graph = Graph_cut(pso.history.position_region, pso.history.fitness_region, bounds, pso.gbest, pso.fit_gbest, pso.history.inter, pso.num_part)
+graph.pos_fit_3d()
+graph.pos_cov_area()
+graph.positions()
+graph.pos_fit_2d()
+
+# pso.map_region_RD(None)
+pso.map_region_MBR(None, True, 100)
+graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, pso.num_part)
+graph.pos_fit_3d()
+graph.pos_cov_area()
+graph.positions()
+graph.pos_fit_2d()
+
+pso.history.region(0.8, 'down')
+graph = Graph_cut(pso.history.position_region, pso.history.fitness_region, bounds, pso.gbest, pso.fit_gbest, pso.history.inter, pso.num_part)
+graph.pos_fit_3d()
+graph.pos_cov_area()
+graph.positions()
+graph.pos_fit_2d()

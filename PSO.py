@@ -3,8 +3,8 @@
 @author: Renilton Ribeiro Almeida
 """
 
-from numpy import array, append, random, diag, dot, shape, where, reshape, hstack, vstack, \
-    full, linspace, sqrt, ndarray, copy, argmin, argmax
+from numpy import array, append, random, diag, dot, where, shape, reshape, hstack, vstack, \
+    full, linspace, sqrt, ndarray, copy, argmin, argmax, zeros
 import plotly.io as pio
 
 pio.renderers.default = 'browser'
@@ -226,6 +226,23 @@ class Particle:
         self.position[testemax] = self.bounds[:, 1][testemax]
         self.position[testemin] = self.bounds[:, 0][testemin]
 
+    def update_position2(self, vel_restraint, new_bounds):
+        """
+        Update particle position
+
+        Parameters
+        ----------
+        vel_restraint: float
+            value by which the velocity will be multiplied when the particle touches the edges
+        """
+        self.position = self.position + self.velocity
+        testemin = self.position < new_bounds[:, 0]
+        testemax = self.position > new_bounds[:, 1]
+        self.velocity[testemin] = self.velocity[testemin] * vel_restraint
+        self.velocity[testemax] = self.velocity[testemax] * vel_restraint
+        self.position[testemin] = new_bounds[:, 0][testemin]
+        self.position[testemax] = new_bounds[:, 1][testemax]
+
 
 class PSO:
 
@@ -275,9 +292,11 @@ class PSO:
                 self._velocity = hstack((self._velocity, reshape(swarm[i].velocity, (self.number_dimensions, 1))))
                 self._fitness = append(self._fitness, swarm[i].fit)
 
-        def add(self, position, fitness, velocity):
+        def add(self, position, fitness, **kwargs):
+            if kwargs.get("velocity") is not None:
+                velocity = kwargs.get("velocity")
+                self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
             self._position = hstack((self._position, reshape(position, (self.number_dimensions, 1))))
-            self._velocity = hstack((self._velocity, reshape(velocity, (self.number_dimensions, 1))))
             self._fitness = append(self._fitness, fitness)
 
         def region(self, function_cut, direction):
@@ -288,7 +307,6 @@ class PSO:
                 self.__test_region = (self._fitness <= cutter)
             self.inter = int((shape(self.fitness_region)[0])/self.num_part)
 
-    # Valores default: adicionar!
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
         Class that uses particles in an optimization loop
@@ -364,9 +382,9 @@ class PSO:
                 """
                 if type(bounds) != ndarray:
                     raise TypeError("The variable 'bounds' must be an array")
-                if type(num_part) != int:
+                if type(num_part) != int and num_part is not None:
                     raise TypeError("The variable 'num_part' must be an integer.")
-                if type(maxiter) != int:
+                if type(maxiter) != int and maxiter is not None:
                     raise TypeError("The variable 'maxiter' must be an integer.")
                 if shape(bounds)[1] != 2:
                     raise TypeError("The variable 'bounds' must have 2 columns")
@@ -393,7 +411,7 @@ class PSO:
                    initial_swarm=kwargs.get("initial_swarm"), vel_restraint=kwargs.get("vel_restraint"),
                    sig_evolution_value=kwargs.get("sig_evolution_value"), significant_evolution=kwargs.get("significant_evolution"))
 
-        number_dimensions = bounds.shape[0]
+        self.number_dimensions = bounds.shape[0]
         self.fit_gbest = float()
         self.gbest = []
         self.swarm = array([])
@@ -401,39 +419,39 @@ class PSO:
         self.vel_restraint = kwargs.get("vel_restraint") if kwargs.get("vel_restraint") is not None else -0.01
         self.inter = 0
         self.bounds = bounds
-        self.num_part = num_part
-        self.pso_version = pso_version
-        self.maxiter = maxiter if maxiter is not None else 1e3
+        self.num_part = num_part if num_part is not None else 30
+        self.pso_version = pso_version if pso_version is not None else 'PSO-WL'
+        self.maxiter = maxiter if maxiter is not None else 500
         self.significant_evolution = kwargs.get("significant_evolution") if kwargs.get("significant_evolution") is not None else 1e3
         self.sig_evolution_value = kwargs.get("sig_evolution_value") if kwargs.get("sig_evolution_value") is not None else 1e-6
 
         if kwargs.get("initial_swarm") == 'Sobol':
             from scipy.stats import qmc
-            init_sobol_vel = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
-            init_sobol_pos = qmc.Sobol(d=number_dimensions).random_base2(m=round(sqrt(num_part)))
+            init_sobol_vel = qmc.Sobol(d=self.number_dimensions).random_base2(m=round(sqrt(self.num_part)))
+            init_sobol_pos = qmc.Sobol(d=self.number_dimensions).random_base2(m=round(sqrt(self.num_part)))
         if kwargs.get("initial_swarm") == 'Pattern':
-            init_pattern_vel = linspace(1, 0, num_part)
-            for i in range(1, number_dimensions):
-                v = linspace((1-(i*0.1)), 0, num_part)
+            init_pattern_vel = linspace(1, 0, self.num_part)
+            for i in range(1, self.number_dimensions):
+                v = linspace((1-(i*0.1)), 0, self.num_part)
                 init_pattern_vel = vstack((init_pattern_vel, v))
-            p = linspace(0, 1, num_part),
-            init_pattern_pos = array(p*number_dimensions)
+            p = linspace(0, 1, self.num_part),
+            init_pattern_pos = array(p*self.number_dimensions)
 
-        for i in range(0, num_part):
+        for i in range(0, self.num_part):
             if kwargs.get("initial_swarm") == 'Sobol':
                 peso_velocity = diag(init_sobol_vel[i, :])
                 peso_position = diag(init_sobol_pos[i, :])
             if kwargs.get("initial_swarm") == 'Pattern':
-                peso_velocity = diag(init_pattern_vel[:number_dimensions, i])
-                peso_position = diag(init_pattern_pos[:number_dimensions, i])
+                peso_velocity = diag(init_pattern_vel[:self.number_dimensions, i])
+                peso_position = diag(init_pattern_pos[:self.number_dimensions, i])
             else:
                 peso_velocity = None
                 peso_position = None
-            self.swarm = append(self.swarm, Particle(myfunction, number_dimensions, self.bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
+            self.swarm = append(self.swarm, Particle(myfunction, self.number_dimensions, self.bounds, c1=kwargs.get('c1'), c2=kwargs.get('c2'),
                                                      wi=kwargs.get('wi'), wf=kwargs.get('wf'), peso_vel=peso_velocity, peso_pos=peso_position))
             self.swarm[i].evaluate_min(0)
 
-        self.history = self.history(number_dimensions, self.swarm, num_part)
+        self.history = self.history(self.number_dimensions, self.swarm, self.num_part)
 
     def minimize(self):
         k = 0
@@ -464,45 +482,55 @@ class PSO:
                 self.swarm[j].update_position(self.vel_restraint)
                 self.swarm[j].evaluate_min(self.inter)
 
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
             self.inter += 1
 
-    def map_region(self):
-        self.inter = 0
-        guide = []
-        while self.inter < self.maxiter:  # stopping criteria
+    def map_region_RD(self, inter_limit): #Random and Deconcentrated
+        inter = 0
+        focal_point = []
+        inter_limit = inter_limit if inter_limit is not None else 500
+        while inter < inter_limit:  # stopping criteria
             for j in range(0, self.num_part):
-                if self.inter == 0:
-                    guide = (self.swarm[j].position/abs(self.swarm[j].position)) * abs(self.bounds[:, 1])
+                if inter == 0:
+                    focal_point = (self.swarm[j].position/abs(self.swarm[j].position)) * abs(self.bounds[:, 1])
                 if all(abs(self.bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(
                         abs(self.bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
                     if all(self.bounds[:, 0] != self.swarm[j].position) and all(
                             self.bounds[:, 1] != self.swarm[j].position):
-                        guide = list(self.swarm[j].position)
-                self.swarm[j].spso(guide)
+                        focal_point = list(self.swarm[j].position)
+                self.swarm[j].spso(focal_point)
                 self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate_min(self.inter)
-                self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-            self.inter += 1
+                self.swarm[j].evaluate_min(inter)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit)
+            inter += 1
 
-    def map_region2(self):
-        guide = []
-        guide_fit = []
+    def map_region_MBR(self, limiter, new_bounds, inter_limit): #looking for the Maximum in a Bounded Region
+        focal_point = []
+        focal_point_fit = []
+        limiter = limiter if limiter is not None else 0.5
         interval = linspace(0.2, 1.0, num=5)
+        if new_bounds is not None:
+            aux = 1.5*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region[self.history.fitness_region.argmax()])])))
+            new_bounds = zeros((self.number_dimensions, 2))
+            new_bounds[:, 0] = -aux
+            new_bounds[:, 1] = aux
         for i in range(0, 5):
-            self.inter = 0
-            while self.inter < 100:  # stopping criteria
+            inter = 0
+            while inter < inter_limit:  # stopping criteria
                 for j in range(0, self.num_part):
-                    if i == 0 and self.inter == 0:
-                        guide = list(self.swarm[j].position)
-                        guide_fit = float(self.swarm[j].fit)
+                    if i == 0 and inter == 0:
+                        focal_point = list(self.swarm[j].position)
+                        focal_point_fit = float(self.swarm[j].fit)
                     if all(abs(self.bounds[:, 0] * interval[i]) > abs(self.swarm[j].position)) and all(abs(self.bounds[:, 1] * interval[i]) > abs(self.swarm[j].position)):
-                        if self.swarm[j].fit > guide_fit:
-                            guide = list(self.swarm[j].position * 0.5)
-                            guide_fit = float(self.swarm[j].fit * 0.5)
-                    self.swarm[j].spso(guide)
-                    self.swarm[j].update_position(self.vel_restraint)
-                    self.swarm[j].evaluate_max(self.inter)
-                    self.history.add(self.swarm[j].position, self.swarm[j].fit, self.swarm[j].velocity)
-                self.inter += 1
+                        if self.swarm[j].fit > focal_point_fit:
+                            focal_point = list(self.swarm[j].position * limiter)
+                            focal_point_fit = float(self.swarm[j].fit * limiter)
+                    self.swarm[j].spso(focal_point)
+                    if new_bounds is not None:
+                        self.swarm[j].update_position2(self.vel_restraint, new_bounds)
+                    else:
+                        self.swarm[j].update_position(self.vel_restraint)
+                    self.swarm[j].evaluate_max(inter)
+                    self.history.add(self.swarm[j].position, self.swarm[j].fit)
+                inter += 1
         # ----------------------------------------------------------------------------------------
