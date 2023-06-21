@@ -22,13 +22,13 @@ class Graph:
             a list with the fitness of each particle in each interaction
         vel : array
             a list with the velocity of each particle in each interaction
-        bounds: array with shape (nd x 2)
+        bounds : array with shape (nd x 2)
             position restriction
         optimal_point: float
             the optimal point
         optimal_fit: float
             the fitness of the optimal point
-        inter
+        inter : int
             number of interactions
         num_part
             number of particles
@@ -56,6 +56,8 @@ class Graph:
         -------
         pos_fit_3d(self)
             Evaluate the objetive function and record its value
+        pos_cov_area(self)
+            Generates the graph of the region covered by the function
         positions(self)
             Generates a 3-dimensional graph in plotly, the fit versus two by two nd positions
         pos_fit_2d(self)
@@ -280,24 +282,12 @@ class Graph_cut:
         -------
         pos_fit_3d(self)
             Evaluate the objetive function and record its value
+        pos_cov_area(self)
+            Generates the graph of the region covered by the function
         positions(self)
             Generates a 3-dimensional graph in plotly, the fit versus two by two nd positions
         pos_fit_2d(self)
             Generates a 2-dimensional plot in matplotlib of the fit versus one in one positions versus the fit
-        int_fitness(self)
-            Generates a 2-dimensional plot in matplotlib of the fit versus interactions
-        int_fit_average(self)
-            Generates a 2-dimensional plot in matplotlib of the fit average of each interaction versus interactions
-        int_fit_sd(self)
-            Generates a 2-dimensional plot in matplotlib of the fit standart desviation of each interaction versus interactions
-        int_velocity(self)
-            Generates a 2-dimensional plot in matplotlib of the velocity versus interactions
-        int_vel_average(self)
-            Generates a 2-dimensional plot in matplotlib of the velocity average of each interaction versus interactions
-        int_vel_sd(self)
-            Generates a 2-dimensional plot in matplotlib of the velocity standart desviation of each interaction versus interactions
-
-
         """
         self.posit = coordinates
         self.fit = fit

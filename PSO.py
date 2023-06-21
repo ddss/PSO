@@ -138,6 +138,15 @@ class Particle:
         ----------
         g_best: float
             the position value of all particles of the swarm
+
+        Attributes
+        ----------
+        r1, r2 : float between 0 and 1
+            randomness generator
+        vel_cognitive : float
+            velocity generator based on pbest
+        vel_social : float
+            velocity generator based on gbest
         """
         r1 = random.random()
         r2 = random.random()
@@ -158,6 +167,17 @@ class Particle:
             the amount of interactions
         i: int
             index
+
+        Attributes
+        ----------
+        r1, r2 : float between 0 and 1
+            randomness generator
+        vel_cognitive : float
+            velocity generator based on pbest
+        vel_social : float
+            velocity generator based on gbest
+        w : float
+            weight of inertia
         """
         r1 = random.random()
         r2 = random.random()
@@ -175,6 +195,17 @@ class Particle:
         ----------
         g_best: float
             record the best value of all values
+
+        Attributes
+        ----------
+        r1, r2, r3 : float between 0 and 1
+            randomness generator
+        vel_cognitive : float
+            velocity generator based on pbest
+        vel_social : float
+            velocity generator based on gbest
+        w : float
+            weight of inertia
         """
         r1 = random.random()
         r2 = random.random()
@@ -199,6 +230,19 @@ class Particle:
             the amount of interactions
         i: int
             index
+
+        Attributes
+        ----------
+        r1, r2 : float between 0 and 1
+            randomness generator
+        k1, k2 : int
+            responsible for non-linear decreasing
+        vel_cognitive : float
+            velocity generator based on pbest
+        vel_social : float
+            velocity generator based on gbest
+        w : float
+            weight of inertia
         """
         r1 = random.random()
         r2 = random.random()
@@ -217,6 +261,11 @@ class Particle:
         ----------
         vel_restraint: float
             value by which the velocity will be multiplied when the particle touches the edges
+
+        Attributes
+        ----------
+        testemax, testemin : array
+            array with the particles that exceeded the bounds
         """
         self.position = self.position + self.velocity
         testemax = self.position > self.bounds[:, 1]
@@ -234,6 +283,11 @@ class Particle:
         ----------
         vel_restraint: float
             value by which the velocity will be multiplied when the particle touches the edges
+
+        Attributes
+        ----------
+        testemax, testemin : array
+            array with the particles that exceeded the bounds
         """
         self.position = self.position + self.velocity
         testemin = self.position < new_bounds[:, 0]
@@ -267,6 +321,11 @@ class PSO:
             ----------
             number_dimensions : int
                 number of dimensions
+            swarm : array
+                set of all particles
+            num_part : int
+                number of particles
+
             Attributes
             ----------
             self._position : array with shape (nd x np*inter)
@@ -365,6 +424,15 @@ class PSO:
             minor significant evolution
         significant_evolution : int
             how many times an evolution less than minor significant evolution can be tolerated
+
+        Methods
+        -------
+        minimize(self)
+            Method to find the minimum point of a function
+        map_region_RD(self, inter_limit)
+            Function mapping method that moves particles randomly through the function avoiding focusing on minima
+        map_region_MBR(self, limiter, new_bounds, inter_limit)
+            Function mapping method that searches for the maximum point of a growing bounded region of the function.
         """
         class validation:
             def __init__(self, bounds, num_part, maxiter, **kwargs):
@@ -379,6 +447,24 @@ class PSO:
                 maxiter: int
                     maximum number of interactions
                 **kwargs:
+                    c1 : int
+                        cognitive constant
+                    c2 : int
+                        social constant
+                    wi : float
+                        initial inertia weight
+                    wf : float
+                        final inertia weight
+                    initial_swarm : str
+                        initialization type of velocities and positions
+                    function_cut : float
+                        fitness value for cutting the graph
+                    vel_restraint : float
+                        value by which the velocity will be multiplied when the particle crosses the edges
+                    sig_evolution_value : float
+                        minor significant evolution
+                    significant_evolution : int
+                        how many times an evolution less than minor significant evolution can be tolerated
                 """
                 if type(bounds) != ndarray:
                     raise TypeError("The variable 'bounds' must be an array")
