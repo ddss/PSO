@@ -540,6 +540,9 @@ class PSO:
         self.history = self.history(self.number_dimensions, self.swarm, self.num_part)
 
     def minimize(self):
+        """
+        Method to find the minimum point of a function
+        """
         k = 0
         while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             gbest_previous = copy(self.fit_gbest)
@@ -571,16 +574,37 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
             self.inter += 1
 
-    def map_region_RD(self, inter_limit): #Random and Deconcentrated
+    def map_region_RD(self, inter_limit, limiter): #Random and Deconcentrated
+        """
+        Function mapping method that moves particles randomly through the function avoiding focusing on minima
+
+        Parameters
+        ----------
+        inter_limit : int
+            amount of interactions
+        limiter : float between 0 and 1
+            lower bound for focal_point
+        Attributes
+        ----------
+        inter:
+            interactions counter
+        focal_point : array
+            the global focus value
+        inter_limit : int
+            amount of interactions
+        limiter : float between 0 and 1
+            lower bound for focal_point
+        """
         inter = 0
         focal_point = []
         inter_limit = inter_limit if inter_limit is not None else 500
+        limiter = limiter if limiter is not None else 0.2
         while inter < inter_limit:  # stopping criteria
             for j in range(0, self.num_part):
                 if inter == 0:
                     focal_point = (self.swarm[j].position/abs(self.swarm[j].position)) * abs(self.bounds[:, 1])
-                if all(abs(self.bounds[:, 0] * 0.2) < abs(self.swarm[j].position)) and all(
-                        abs(self.bounds[:, 1] * 0.2) < abs(self.swarm[j].position)):
+                if all(abs(self.bounds[:, 0] * limiter) < abs(self.swarm[j].position)) and all(
+                        abs(self.bounds[:, 1] * limiter) < abs(self.swarm[j].position)):
                     if all(self.bounds[:, 0] != self.swarm[j].position) and all(
                             self.bounds[:, 1] != self.swarm[j].position):
                         focal_point = list(self.swarm[j].position)
@@ -590,13 +614,43 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit)
             inter += 1
 
-    def map_region_MBR(self, limiter, new_bounds, inter_limit): #looking for the Maximum in a Bounded Region
+    def map_region_MBR(self, focal_point_splitter, inter_limit, new_bounds, bounds_control): #looking for the Maximum in a Bounded Region
+        """
+        Function mapping method that moves particles randomly through the function avoiding focusing on minima
+
+        Parameters
+        ----------
+        focal_point_splitter : float between 0 and 1
+            lower bound for focal_point
+        inter_limit : int
+            amount of interactions
+        new_bounds : bool
+            set or not set new bounds based on the cut function
+        bounds_control : float
+            increases or decreases the new bounds, or keeps using the value 1
+        Attributes
+        ----------
+        inter:
+            interactions counter
+        focal_point : array
+            the global focus position
+        focal_point_fit : array
+            the fitness in the global focus position
+        focal_point_splitter : float between 0 and 1
+            lower bound for focal_point
+        bounds_control : float
+            increases or decreases the new bounds, or keeps using the value 1
+        interval : array
+            interval by which bounds grows
+        """
         focal_point = []
         focal_point_fit = []
-        limiter = limiter if limiter is not None else 0.5
+        focal_point_splitter = focal_point_splitter if focal_point_splitter is not None else 0.5
+        bounds_control = bounds_control if bounds_control is not None else 1
         interval = linspace(0.2, 1.0, num=5)
+        print(type(interval))
         if new_bounds is not None:
-            aux = 1.5*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region[self.history.fitness_region.argmax()])])))
+            aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region[self.history.fitness_region.argmax()])])))
             new_bounds = zeros((self.number_dimensions, 2))
             new_bounds[:, 0] = -aux
             new_bounds[:, 1] = aux
@@ -609,8 +663,8 @@ class PSO:
                         focal_point_fit = float(self.swarm[j].fit)
                     if all(abs(self.bounds[:, 0] * interval[i]) > abs(self.swarm[j].position)) and all(abs(self.bounds[:, 1] * interval[i]) > abs(self.swarm[j].position)):
                         if self.swarm[j].fit > focal_point_fit:
-                            focal_point = list(self.swarm[j].position * limiter)
-                            focal_point_fit = float(self.swarm[j].fit * limiter)
+                            focal_point = list(self.swarm[j].position * focal_point_splitter)
+                            focal_point_fit = float(self.swarm[j].fit * focal_point_splitter)
                     self.swarm[j].spso(focal_point)
                     if new_bounds is not None:
                         self.swarm[j].update_position2(self.vel_restraint, new_bounds)

@@ -7,13 +7,13 @@ from Graphics import Graph_cut, Graph  # Importing the Graphics
 from Modelo_benchmark import modelo_benchmark  # Importing the function to be minimized
 from numpy import array, shape, argmax, argmin
 
-function = 'Rosenbrook'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
+function = 'Rastrigin'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
 bounds = array([[-10, 10], [-10, 10]])
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds),
-          pso_version=None,  # SPSO, PSO-WL, PSO-WR pso_chongpeng
+          pso_version='PSO-WL',  # SPSO, PSO-WL, PSO-WR pso_chongpeng
           bounds=bounds,  # input limits [(x_min,x_max)]
-          num_part=None,  # amount of particles
-          maxiter=None,  # amount of interactions that each particle will make
+          num_part=30,  # amount of particles
+          maxiter=500,  # amount of interactions that each particle will make
           c1=float(1),  # cognitive constant
           c2=float(2),  # social constant
           wi=float(0.9),  # initial inertia
@@ -39,22 +39,22 @@ graph.int_velocity()
 graph.int_vel_average()
 graph.int_vel_sd()
 
-pso.history.region(10, 'down')
+pso.history.region(50, 'down')
 graph = Graph_cut(pso.history.position_region, pso.history.fitness_region, bounds, pso.gbest, pso.fit_gbest, pso.history.inter, pso.num_part)
 graph.pos_fit_3d()
 graph.pos_cov_area()
 graph.positions()
 graph.pos_fit_2d()
 
-pso.map_region_RD(None)
-# pso.map_region_MBR(None, True, 100)
+# pso.map_region_RD(500, 0.2)
+pso.map_region_MBR(None, 100, True, 1)
 graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.inter, pso.num_part)
 graph.pos_fit_3d()
 graph.pos_cov_area()
 graph.positions()
 graph.pos_fit_2d()
 
-pso.history.region(10, 'down')
+pso.history.region(50, 'down')
 graph = Graph_cut(pso.history.position_region, pso.history.fitness_region, bounds, pso.gbest, pso.fit_gbest, pso.history.inter, pso.num_part)
 graph.pos_fit_3d()
 graph.pos_cov_area()
