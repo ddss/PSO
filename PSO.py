@@ -6,9 +6,9 @@
 from numpy import array, append, random, diag, dot, where, shape, reshape, hstack, vstack, \
     full, linspace, sqrt, ndarray, copy, argmin, argmax, zeros
 from heapq import nlargest
-# import plotly.io as pio
-#
-# pio.renderers.default = 'browser'
+import plotly.io as pio
+
+pio.renderers.default = 'browser'
 
 
 # --- MAIN ---------------------------------------------------------------------+
@@ -653,17 +653,19 @@ class PSO:
         focal_point = []
         focal_point_fit = []
         relaxation = linspace(0.2, 1.0, num=b_divisions)
-        if new_bounds is not None:
+        if new_bounds is True:
             top_ten = nlargest(10, self.history.fitness_region)
-            max_top_ten = 0
-            for i in range (0, 10):
+            index_top_ten = where(self.history.fitness_region == top_ten[0])
+            max_top_ten = self.history.position_region[:, index_top_ten[0]]
+            for i in range (1, 10):
                 index_top_ten = where(self.history.fitness_region == top_ten[i])
-                max_top_ten = append(max_top_ten, abs(self.history.position_region[:, index_top_ten]))
+                max_top_ten = hstack([max_top_ten, self.history.position_region[:, index_top_ten[0]]])
             aux = bounds_control*max(max_top_ten)
             # aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region.max())])))
             new_bounds = zeros((self.number_dimensions, 2))
-            new_bounds[:, 0] = -aux
-            new_bounds[:, 1] = aux
+            for i in range(self.number_dimensions):
+                new_bounds[i, 0] = -max(abs(max_top_ten[i,:]))*bounds_control
+                new_bounds[i, 1] = max(abs(max_top_ten[i,:]))*bounds_control
         for i in range(0, 5):
             iter = 0
             while iter < iter_limit:  # stopping criteria
@@ -676,7 +678,7 @@ class PSO:
                             focal_point = list(self.swarm[j].position * focal_point_contraction)
                             focal_point_fit = float(self.swarm[j].fit * focal_point_contraction)
                     self.swarm[j].spso(focal_point)
-                    if new_bounds is not None:
+                    if new_bounds is True:
                         self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
                     else:
                         self.swarm[j].update_position(self.vel_restraint)
