@@ -5,9 +5,10 @@
 
 from numpy import array, append, random, diag, dot, where, shape, reshape, hstack, vstack, \
     full, linspace, sqrt, ndarray, copy, argmin, argmax, zeros
-import plotly.io as pio
-
-pio.renderers.default = 'browser'
+from heapq import nlargest
+# import plotly.io as pio
+#
+# pio.renderers.default = 'browser'
 
 
 # --- MAIN ---------------------------------------------------------------------+
@@ -106,27 +107,27 @@ class Particle:
         self.velocity = dot(peso_vel, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
         self.position = dot(peso_pos, (bounds[:, 1]-bounds[:, 0])) + (bounds[:, 0])
 
-    def evaluate_min(self, inter):
+    def evaluate_min(self, iter):
         """
         Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
         Parameters
         ----------
-        inter: interaction number
+        iter: iteraction number
         """
         self.fit = self.__function(self.position)
-        if self.fit < self.fit_best or inter == 0:
+        if self.fit < self.fit_best or iter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
 
-    def evaluate_max(self, inter):
+    def evaluate_max(self, iter):
         """
         Evaluate the objetive function and record its value. It also defines the pbest and fit_best attributes
         Parameters
         ----------
-        inter: interaction number
+        iter: iteraction number
         """
         self.fit = self.__function(self.position)
-        if self.fit > self.fit_best or inter == 0:
+        if self.fit > self.fit_best or iter == 0:
             self.pbest = self.position
             self.fit_best = self.fit
 
@@ -164,7 +165,7 @@ class Particle:
         g_best: float
             record the best value of all values
         maxiter: int
-            the amount of interactions
+            the amount of iterations
         i: int
             index
 
@@ -227,7 +228,7 @@ class Particle:
         g_best: float
             record the best value of all values
         maxiter: int
-            the amount of interactions
+            the amount of iterations
         i: int
             index
 
@@ -275,14 +276,16 @@ class Particle:
         self.position[testemax] = self.bounds[:, 1][testemax]
         self.position[testemin] = self.bounds[:, 0][testemin]
 
-    def update_position2(self, vel_restraint, new_bounds):
+    def adjust_position(self, vel_restraint, new_bounds):
         """
         Update particle position
 
         Parameters
         ----------
-        vel_restraint: float
+        vel_restraint : float
             value by which the velocity will be multiplied when the particle touches the edges
+        new_bounds : array (nd x 2)
+            new bounds based on the cut made on the graph, which will limit the search space of the particles
 
         Attributes
         ----------
@@ -328,12 +331,12 @@ class PSO:
 
             Attributes
             ----------
-            self._position : array with shape (nd x np*inter)
-                an array to record the positional coordinates of each particle in each interaction
-            self._velocity : array  with shape (nd x np*inter)
-                an array to record the velocity coordinates of each particle in each interaction
-            self._fitness : array with shape (1 x np*inter)
-                an array to record the fitness of each particle in each interaction
+            self._position : array with shape (nd x np*iter)
+                an array to record the positional coordinates of each particle in each iteraction
+            self._velocity : array  with shape (nd x np*iter)
+                an array to record the velocity coordinates of each particle in each iteration
+            self._fitness : array with shape (1 x np*iter)
+                an array to record the fitness of each particle in each iteraction
             Methods
             -------
             add(self, position, fitness, velocity)
@@ -364,11 +367,11 @@ class PSO:
                 self.__test_region = (self._fitness >= cutter)
             elif direction == 'down':
                 self.__test_region = (self._fitness <= cutter)
-            self.inter = int((shape(self.fitness_region)[0])/self.num_part)
+            self.iter = int((shape(self.fitness_region)[0])/self.num_part)
 
     def __init__(self, myfunction, pso_version, bounds, num_part, maxiter, **kwargs):
         """
-        Class that uses particles in an optimization loop
+        Main class, assembles the swarm and contains the history and validation classes and the optimization and mapping loops.
         Parameters
         ----------
         myfunction : function
@@ -380,7 +383,7 @@ class PSO:
         num_part : int
             number of particles
         maxiter : int
-            maximum number of interactions
+            maximum number of iterations
         **kwargs :
             c1 : int
                 cognitive constant
@@ -419,7 +422,7 @@ class PSO:
             other, and it must be negative so that the particle follows the path opposite to the
             end it is attached to.
         self.maxiter: int
-            maximum number of interactions
+            maximum number of iterations
         sig_evolution_value : float
             minor significant evolution
         significant_evolution : int
@@ -429,9 +432,9 @@ class PSO:
         -------
         minimize(self)
             Method to find the minimum point of a function
-        map_region_RD(self, inter_limit)
+        map_region_RD(self, iter_limit)
             Function mapping method that moves particles randomly through the function avoiding focusing on minima
-        map_region_MBR(self, limiter, new_bounds, inter_limit)
+        map_region_MBR(self, limiter, new_bounds, iter_limit)
             Function mapping method that searches for the maximum point of a growing bounded region of the function.
         """
         class validation:
@@ -445,7 +448,7 @@ class PSO:
                 num_part: int
                     number of particles
                 maxiter: int
-                    maximum number of interactions
+                    maximum number of iterations
                 **kwargs:
                     c1 : int
                         cognitive constant
@@ -503,7 +506,7 @@ class PSO:
         self.swarm = array([])
         self.function_cut = kwargs.get("function_cut")
         self.vel_restraint = kwargs.get("vel_restraint") if kwargs.get("vel_restraint") is not None else -0.01
-        self.inter = 0
+        self.iter = 0
         self.bounds = bounds
         self.num_part = num_part if num_part is not None else 30
         self.pso_version = pso_version if pso_version is not None else 'PSO-WL'
@@ -544,7 +547,7 @@ class PSO:
         Method to find the minimum point of a function
         """
         k = 0
-        while self.inter < self.maxiter and k < self.significant_evolution:  # stopping criteria
+        while self.iter < self.maxiter and k < self.significant_evolution:  # stopping criteria
             gbest_previous = copy(self.fit_gbest)
 
             # determines if the current particle is the best (globally)
@@ -554,54 +557,59 @@ class PSO:
                 k = 0
 
             for j in range(0, self.num_part):
-                if self.swarm[j].fit < self.fit_gbest or self.inter == 0:
+                if self.swarm[j].fit < self.fit_gbest or self.iter == 0:
                     self.gbest = list(self.swarm[j].position)
                     self.fit_gbest = float(self.swarm[j].fit)
 
                 if self.pso_version == 'SPSO':
                     self.swarm[j].spso(self.gbest)
                 elif self.pso_version == 'PSO-WL':
-                    self.swarm[j].pso_wl(self.gbest, self.maxiter, self.inter)
+                    self.swarm[j].pso_wl(self.gbest, self.maxiter, self.iter)
                 elif self.pso_version == 'PSO-WR':
                     self.swarm[j].pso_wr(self.gbest)
                 elif self.pso_version == 'pso_chongpeng':
-                    self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.inter)
+                    self.swarm[j].pso_chongpeng(self.gbest, self.maxiter, self.iter)
                 else:
                     raise NameError("Available PSO versions are: 'SPSO', 'PSO-WL', 'PSO-WR' and 'pso_chongpeng'.\nPlease choose one of them")
                 self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate_min(self.inter)
+                self.swarm[j].evaluate_min(self.iter)
 
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
-            self.inter += 1
+            self.iter += 1
 
-    def map_region_RD(self, inter_limit, limiter): #Random and Deconcentrated
+    def map_region_RD(self, new_bounds, iter_limit=500, limiter=0.2, bounds_control=1): #Random and Deconcentrated
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
         Parameters
         ----------
-        inter_limit : int
-            amount of interactions
+        iter_limit : int
+            number of mapping iterations
         limiter : float between 0 and 1
-            lower bound for focal_point
+            prevents the focal point from being in the center, a region already mapped by the minimize method
         Attributes
         ----------
-        inter:
-            interactions counter
+        iter:
+            iterations counter
         focal_point : array
             the global focus value
-        inter_limit : int
-            amount of interactions
-        limiter : float between 0 and 1
-            lower bound for focal_point
         """
-        inter = 0
+        iter = 0
         focal_point = []
-        inter_limit = inter_limit if inter_limit is not None else 500
-        limiter = limiter if limiter is not None else 0.2
-        while inter < inter_limit:  # stopping criteria
+        if new_bounds is not None:
+            top_ten = nlargest(10, self.history.fitness_region)
+            max_top_ten = 0
+            for i in range (0, 10):
+                index_top_ten = where(self.history.fitness_region == top_ten[i])
+                max_top_ten = append(max_top_ten, abs(self.history.position_region[:, index_top_ten]))
+            aux = bounds_control*max(max_top_ten)
+            # aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region.max())])))
+            new_bounds = zeros((self.number_dimensions, 2))
+            new_bounds[:, 0] = -aux
+            new_bounds[:, 1] = aux
+        while iter < iter_limit:  # stopping criteria
             for j in range(0, self.num_part):
-                if inter == 0:
+                if iter == 0:
                     focal_point = (self.swarm[j].position/abs(self.swarm[j].position)) * abs(self.bounds[:, 1])
                 if all(abs(self.bounds[:, 0] * limiter) < abs(self.swarm[j].position)) and all(
                         abs(self.bounds[:, 1] * limiter) < abs(self.swarm[j].position)):
@@ -609,68 +617,70 @@ class PSO:
                             self.bounds[:, 1] != self.swarm[j].position):
                         focal_point = list(self.swarm[j].position)
                 self.swarm[j].spso(focal_point)
-                self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate_min(inter)
+                if new_bounds is not None:
+                    self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
+                else:
+                    self.swarm[j].update_position(self.vel_restraint)
+                self.swarm[j].evaluate_min(iter)
                 self.history.add(self.swarm[j].position, self.swarm[j].fit)
-            inter += 1
+            iter += 1
 
-    def map_region_MBR(self, focal_point_splitter, inter_limit, new_bounds, bounds_control): #looking for the Maximum in a Bounded Region
+    def map_region_MBR(self, new_bounds, iter_limit=100, focal_point_contraction=0.5, bounds_control=1, b_divisions=5): #looking for the Maximum in a Bounded Region
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
         Parameters
         ----------
-        focal_point_splitter : float between 0 and 1
-            lower bound for focal_point
-        inter_limit : int
-            amount of interactions
+        iter_limit : int
+            number of mapping iterations
         new_bounds : bool
             set or not set new bounds based on the cut function
+        focal_point_contraction : float between 0 and 1
+            contracts the new focal point so the particles travel more through the middle and don't get stuck at the edges
         bounds_control : float
-            increases or decreases the new bounds, or keeps using the value 1
+            increases or decreases the new bounds, or, using the value 1, keeps it
         Attributes
         ----------
-        inter:
-            interactions counter
+        iter:
+            iterations counter
         focal_point : array
             the global focus position
         focal_point_fit : array
             the fitness in the global focus position
-        focal_point_splitter : float between 0 and 1
-            lower bound for focal_point
-        bounds_control : float
-            increases or decreases the new bounds, or keeps using the value 1
-        interval : array
-            interval by which bounds grows
+        relaxation : array
+            iterval by which bounds grows
         """
         focal_point = []
         focal_point_fit = []
-        focal_point_splitter = focal_point_splitter if focal_point_splitter is not None else 0.5
-        bounds_control = bounds_control if bounds_control is not None else 1
-        interval = linspace(0.2, 1.0, num=5)
-        print(type(interval))
+        relaxation = linspace(0.2, 1.0, num=b_divisions)
         if new_bounds is not None:
-            aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region[self.history.fitness_region.argmax()])])))
+            top_ten = nlargest(10, self.history.fitness_region)
+            max_top_ten = 0
+            for i in range (0, 10):
+                index_top_ten = where(self.history.fitness_region == top_ten[i])
+                max_top_ten = append(max_top_ten, abs(self.history.position_region[:, index_top_ten]))
+            aux = bounds_control*max(max_top_ten)
+            # aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region.max())])))
             new_bounds = zeros((self.number_dimensions, 2))
             new_bounds[:, 0] = -aux
             new_bounds[:, 1] = aux
         for i in range(0, 5):
-            inter = 0
-            while inter < inter_limit:  # stopping criteria
+            iter = 0
+            while iter < iter_limit:  # stopping criteria
                 for j in range(0, self.num_part):
-                    if i == 0 and inter == 0:
+                    if i == 0 and iter == 0:
                         focal_point = list(self.swarm[j].position)
                         focal_point_fit = float(self.swarm[j].fit)
-                    if all(abs(self.bounds[:, 0] * interval[i]) > abs(self.swarm[j].position)) and all(abs(self.bounds[:, 1] * interval[i]) > abs(self.swarm[j].position)):
+                    if all(abs(self.bounds[:, 0] * relaxation[i]) > abs(self.swarm[j].position)) and all(abs(self.bounds[:, 1] * relaxation[i]) > abs(self.swarm[j].position)):
                         if self.swarm[j].fit > focal_point_fit:
-                            focal_point = list(self.swarm[j].position * focal_point_splitter)
-                            focal_point_fit = float(self.swarm[j].fit * focal_point_splitter)
+                            focal_point = list(self.swarm[j].position * focal_point_contraction)
+                            focal_point_fit = float(self.swarm[j].fit * focal_point_contraction)
                     self.swarm[j].spso(focal_point)
                     if new_bounds is not None:
-                        self.swarm[j].update_position2(self.vel_restraint, new_bounds)
+                        self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
                     else:
                         self.swarm[j].update_position(self.vel_restraint)
-                    self.swarm[j].evaluate_max(inter)
+                    self.swarm[j].evaluate_max(iter)
                     self.history.add(self.swarm[j].position, self.swarm[j].fit)
-                inter += 1
+                iter += 1
         # ----------------------------------------------------------------------------------------

@@ -157,7 +157,7 @@ class Graph:
     # Interactions(x) X Fitness(y)
     def int_fitness(self):
         mp.figure()
-        mp.xlabel('Interactions')
+        mp.xlabel('Interactions x Particles')
         mp.ylabel('Fit')
         aux = array([])
         for i in range(0, self.num_part*self.inter):
@@ -195,7 +195,7 @@ class Graph:
     # Interactions(x) X Velocity(x)
     def int_velocity(self):
         mp.figure()
-        mp.xlabel('Interactions')
+        mp.xlabel('Interactions x Particles')
         mp.ylabel('Velocity')
         for i in range(self.dim):
             mp.plot(self.vel[i], '.', label=r'$v_{}$'.format(i+1), alpha=(1/(i+1)))
