@@ -583,7 +583,7 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
             self.iter += 1
 
-    def map_region_BW(self, iter_limit=500):  # mapping based on gBest and gWorst
+    def map_region_BW(self, iter_limit=500, top_particles=10):  # mapping based on gBest and gWorst
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
@@ -591,6 +591,8 @@ class PSO:
         ----------
         iter_limit : int
             number of mapping iterations
+        top_particles : int
+            the amount of particles with the highest fits to select the one with the highest position
         Attributes
         ----------
         iter:
@@ -601,9 +603,9 @@ class PSO:
             the best position found
         gworst :
             the worst position found
-        top_ten :
-            top ten values
-        max_top_ten :
+        largest_particles :
+            particles with largest values
+        pos_largest_particles :
             the ten positions of the highest values
         relaxation :
             range that will multiply gbest and gworst
@@ -611,18 +613,20 @@ class PSO:
         iter = 0
         focal_point = []
         gbest = array(self.gbest)
+        gworst = []
         relaxation = linspace(0.0, 1.0, num=iter_limit)
-        top_ten = nlargest(10, self.history.fitness_region)
-        index_top_ten = where(self.history.fitness_region == top_ten[0])
-        max_top_ten = self.history.position_region[:, index_top_ten[0]]
-        for i in range(1, 10):
-            index_top_ten = where(self.history.fitness_region == top_ten[i])
-            max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
-        gworst = max(max_top_ten[0], key=abs)
+        largest_particles = nlargest(top_particles, self.history.fitness_region)
+        index_largest_particles = where(self.history.fitness_region == largest_particles[0])
+        pos_largest_particles = self.history.position_region[:, index_largest_particles[0]]
+        for i in range(1, top_particles):
+            index_largest_particles = where(self.history.fitness_region == largest_particles[i])
+            pos_largest_particles = hstack((pos_largest_particles, self.history.position_region[:, index_largest_particles[0]]))
+            gworst = append(gworst, max(pos_largest_particles[:, i], key=abs))
+        gworst = max(gworst, key=abs)
         new_bounds = zeros((self.number_dimensions, 2))
         for i in range(self.number_dimensions):
-            new_bounds[i, 0] = (-max(abs(max_top_ten[i, :])))
-            new_bounds[i, 1] = (max(abs(max_top_ten[i, :])))
+            new_bounds[i, 0] = (-max(abs(pos_largest_particles[i, :])))
+            new_bounds[i, 1] = (max(abs(pos_largest_particles[i, :])))
         while iter < iter_limit:  # stopping criteria
             for j in range(0, self.num_part):
                 if j == 0:
@@ -637,7 +641,7 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit)
             iter += 1
 
-    def map_region_RD(self, new_bounds, iter_limit=500, limiter=0.2, bounds_control=1): #Random and Deconcentrated
+    def map_region_RD(self, new_bounds, iter_limit=500, limiter=0.2, bounds_control=1, top_particles=10): #Random and Deconcentrated
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
@@ -647,6 +651,10 @@ class PSO:
             number of mapping iterations
         limiter : float between 0 and 1
             prevents the focal point from being in the center, a region already mapped by the minimize method
+        bounds_control : float
+            increases or decreases the new bounds, or, using the value 1, keeps it
+        top_particles : int
+            the amount of particles with the highest fits to select the one with the highest position
         Attributes
         ----------
         iter:
@@ -657,16 +665,17 @@ class PSO:
         iter = 0
         focal_point = []
         if new_bounds is True:
-            top_ten = nlargest(10, self.history.fitness_region)
-            index_top_ten = where(self.history.fitness_region == top_ten[0])
-            max_top_ten = self.history.position_region[:, index_top_ten[0]]
-            for i in range(1, 10):
-                index_top_ten = where(self.history.fitness_region == top_ten[i])
-                max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
+            largest_particles = nlargest(top_particles, self.history.fitness_region)
+            index_largest_particles = where(self.history.fitness_region == largest_particles[0])
+            pos_largest_particles = self.history.position_region[:, index_largest_particles[0]]
+            for i in range(1, top_particles):
+                index_largest_particles = where(self.history.fitness_region == largest_particles[i])
+                pos_largest_particles = hstack(
+                    (pos_largest_particles, self.history.position_region[:, index_largest_particles[0]]))
             new_bounds = zeros((self.number_dimensions, 2))
             for i in range(self.number_dimensions):
-                new_bounds[i, 0] = bounds_control*(-max(abs(max_top_ten[i, :])))
-                new_bounds[i, 1] = bounds_control*(max(abs(max_top_ten[i, :])))
+                new_bounds[i, 0] = bounds_control * (-max(abs(pos_largest_particles[i, :])))
+                new_bounds[i, 1] = bounds_control * (max(abs(pos_largest_particles[i, :])))
         while iter < iter_limit:  # stopping criteria
             for j in range(0, self.num_part):
                 if iter == 0:
@@ -685,7 +694,7 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit)
             iter += 1
 
-    def map_region_MBR(self, new_bounds, iter_limit=100, focal_point_contraction=0.5, bounds_control=1, b_divisions=5): #looking for the Maximum in a Bounded Region
+    def map_region_MBR(self, new_bounds, iter_limit=100, focal_point_contraction=0.5, bounds_control=1, b_divisions=5, top_particles=10): #looking for the Maximum in a Bounded Region
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
@@ -699,6 +708,10 @@ class PSO:
             contracts the new focal point so the particles travel more through the middle and don't get stuck at the edges
         bounds_control : float
             increases or decreases the new bounds, or, using the value 1, keeps it
+        b_divisions : int
+            number of times the bounds are divided
+        top_particles : int
+            the amount of particles with the highest fits to select the one with the highest position
         Attributes
         ----------
         iter:
@@ -714,17 +727,16 @@ class PSO:
         focal_point_fit = []
         relaxation = linspace(0.2, 1.0, num=b_divisions)
         if new_bounds is True:
-            top_ten = nlargest(10, self.history.fitness_region)
-            index_top_ten = where(self.history.fitness_region == top_ten[0])
-            max_top_ten = self.history.position_region[:, index_top_ten[0]]
-            for i in range(1, 10):
-                index_top_ten = where(self.history.fitness_region == top_ten[i])
-                max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
+            largest_particles = nlargest(top_particles, self.history.fitness_region)
+            index_largest_particles = where(self.history.fitness_region == largest_particles[0])
+            pos_largest_particles = self.history.position_region[:, index_largest_particles[0]]
+            for i in range(1, top_particles):
+                index_largest_particles = where(self.history.fitness_region == largest_particles[i])
+                pos_largest_particles = hstack((pos_largest_particles, self.history.position_region[:, index_largest_particles[0]]))
             new_bounds = zeros((self.number_dimensions, 2))
             for i in range(self.number_dimensions):
-                new_bounds[i, 0] = bounds_control*(-max(abs(max_top_ten[i, :])))
-                new_bounds[i, 1] = bounds_control*(max(abs(max_top_ten[i, :])))
-            print(new_bounds)
+                new_bounds[i, 0] = bounds_control*(-max(abs(pos_largest_particles[i, :])))
+                new_bounds[i, 1] = bounds_control*(max(abs(pos_largest_particles[i, :])))
         for i in range(0, 5):
             iter = 0
             while iter < iter_limit:  # stopping criteria
