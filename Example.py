@@ -8,7 +8,7 @@ from Modelo_benchmark import modelo_benchmark  # Importing the function to be mi
 from numpy import array, shape, argmax, argmin
 
 function = 'Rastrigin'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
-bounds = array([[-10, 10],[-10, 10], [-10, 10],[-10,10]])
+bounds = array([[-10, 10], [-10, 10], [-10, 10]])
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds),
           pso_version='PSO-WL',  # SPSO, PSO-WL, PSO-WR pso_chongpeng
           bounds=bounds,  # input limits [(x_min,x_max)]
@@ -48,7 +48,7 @@ pso.history.region(50, 'down')
 # graph.pos_fit_2d()
 
 # pso.map_region_RD(True, 500, 0.2)
-pso.map_region_MBR(True)
+pso.map_region_BW()
 # graph = Graph(pso.history._position, pso.history._fitness, pso.history._velocity, bounds, pso.gbest, pso.fit_gbest, pso.iter, pso.num_part)
 # graph.pos_fit_3d()
 # graph.pos_cov_area()

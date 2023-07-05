@@ -4,7 +4,7 @@
 """
 
 from numpy import array, append, random, diag, dot, where, shape, reshape, hstack, vstack, \
-    full, linspace, sqrt, ndarray, copy, argmin, argmax, zeros
+    full, linspace, sqrt, ndarray, copy, argmin, argmax, zeros, log
 from heapq import nlargest
 import plotly.io as pio
 
@@ -311,11 +311,17 @@ class PSO:
 
         @property
         def fitness_region(self):
-            return self._fitness[self.__test_region]
+            try:
+                return self._fitness[self.__test_region]
+            except AttributeError:
+                raise AttributeError("It is necessary to cut the function before")
 
         @property
         def position_region(self):
-            return self._position[:, self.__test_region]
+            try:
+                return self._position[:, self.__test_region]
+            except AttributeError:
+                raise AttributeError("It is necessary to cut the function before")
 
         def __init__(self, number_dimensions, swarm, num_part):
             """
@@ -577,6 +583,60 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
             self.iter += 1
 
+    def map_region_BW(self, iter_limit=500):  # mapping based on gBest and gWorst
+        """
+        Function mapping method that moves particles randomly through the function avoiding focusing on minima
+
+        Parameters
+        ----------
+        iter_limit : int
+            number of mapping iterations
+        Attributes
+        ----------
+        iter:
+            iterations counter
+        focal_point : array
+            the global focus value
+        gbest :
+            the best position found
+        gworst :
+            the worst position found
+        top_ten :
+            top ten values
+        max_top_ten :
+            the ten positions of the highest values
+        relaxation :
+            range that will multiply gbest and gworst
+        """
+        iter = 0
+        focal_point = []
+        gbest = array(self.gbest)
+        relaxation = linspace(0.0, 1.0, num=iter_limit)
+        top_ten = nlargest(10, self.history.fitness_region)
+        index_top_ten = where(self.history.fitness_region == top_ten[0])
+        max_top_ten = self.history.position_region[:, index_top_ten[0]]
+        for i in range(1, 10):
+            index_top_ten = where(self.history.fitness_region == top_ten[i])
+            max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
+        gworst = max(max_top_ten[0], key=abs)
+        new_bounds = zeros((self.number_dimensions, 2))
+        for i in range(self.number_dimensions):
+            new_bounds[i, 0] = (-max(abs(max_top_ten[i, :])))
+            new_bounds[i, 1] = (max(abs(max_top_ten[i, :])))
+        while iter < iter_limit:  # stopping criteria
+            for j in range(0, self.num_part):
+                if j == 0:
+                    alpha = relaxation[iter]
+                    focal_point = alpha*gbest + (1-alpha)*gworst
+                self.swarm[j].spso(focal_point)
+                if new_bounds is not None:
+                    self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
+                else:
+                    self.swarm[j].update_position(self.vel_restraint)
+                self.swarm[j].evaluate_min(iter)
+                self.history.add(self.swarm[j].position, self.swarm[j].fit)
+            iter += 1
+
     def map_region_RD(self, new_bounds, iter_limit=500, limiter=0.2, bounds_control=1): #Random and Deconcentrated
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
@@ -596,17 +656,17 @@ class PSO:
         """
         iter = 0
         focal_point = []
-        if new_bounds is not None:
+        if new_bounds is True:
             top_ten = nlargest(10, self.history.fitness_region)
-            max_top_ten = 0
-            for i in range (0, 10):
+            index_top_ten = where(self.history.fitness_region == top_ten[0])
+            max_top_ten = self.history.position_region[:, index_top_ten[0]]
+            for i in range(1, 10):
                 index_top_ten = where(self.history.fitness_region == top_ten[i])
-                max_top_ten = append(max_top_ten, abs(self.history.position_region[:, index_top_ten]))
-            aux = bounds_control*max(max_top_ten)
-            # aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region.max())])))
+                max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
             new_bounds = zeros((self.number_dimensions, 2))
-            new_bounds[:, 0] = -aux
-            new_bounds[:, 1] = aux
+            for i in range(self.number_dimensions):
+                new_bounds[i, 0] = bounds_control*(-max(abs(max_top_ten[i, :])))
+                new_bounds[i, 1] = bounds_control*(max(abs(max_top_ten[i, :])))
         while iter < iter_limit:  # stopping criteria
             for j in range(0, self.num_part):
                 if iter == 0:
@@ -657,15 +717,14 @@ class PSO:
             top_ten = nlargest(10, self.history.fitness_region)
             index_top_ten = where(self.history.fitness_region == top_ten[0])
             max_top_ten = self.history.position_region[:, index_top_ten[0]]
-            for i in range (1, 10):
+            for i in range(1, 10):
                 index_top_ten = where(self.history.fitness_region == top_ten[i])
-                max_top_ten = hstack([max_top_ten, self.history.position_region[:, index_top_ten[0]]])
-            aux = bounds_control*max(max_top_ten)
-            # aux = bounds_control*(max(abs(self.history._position[:, where(self.history._fitness == self.history.fitness_region.max())])))
+                max_top_ten = hstack((max_top_ten, self.history.position_region[:, index_top_ten[0]]))
             new_bounds = zeros((self.number_dimensions, 2))
             for i in range(self.number_dimensions):
-                new_bounds[i, 0] = -max(abs(max_top_ten[i,:]))*bounds_control
-                new_bounds[i, 1] = max(abs(max_top_ten[i,:]))*bounds_control
+                new_bounds[i, 0] = bounds_control*(-max(abs(max_top_ten[i, :])))
+                new_bounds[i, 1] = bounds_control*(max(abs(max_top_ten[i, :])))
+            print(new_bounds)
         for i in range(0, 5):
             iter = 0
             while iter < iter_limit:  # stopping criteria
