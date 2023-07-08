@@ -583,7 +583,7 @@ class PSO:
                 self.history.add(self.swarm[j].position, self.swarm[j].fit, velocity=self.swarm[j].velocity)
             self.iter += 1
 
-    def map_region_BW(self, iter_limit=500, top_particles=10):  # mapping based on gBest and gWorst
+    def map_region_BW(self, iter_limit=50, top_particles=10):  # mapping based on gBest and gWorst
         """
         Function mapping method that moves particles randomly through the function avoiding focusing on minima
 
@@ -610,36 +610,35 @@ class PSO:
         relaxation :
             range that will multiply gbest and gworst
         """
-        iter = 0
+        iter = 1
         focal_point = []
         gbest = array(self.gbest)
         gworst = []
-        relaxation = linspace(0.0, 1.0, num=iter_limit)
         largest_particles = nlargest(top_particles, self.history.fitness_region)
         index_largest_particles = where(self.history.fitness_region == largest_particles[0])
         pos_largest_particles = self.history.position_region[:, index_largest_particles[0]]
         for i in range(1, top_particles):
             index_largest_particles = where(self.history.fitness_region == largest_particles[i])
             pos_largest_particles = hstack((pos_largest_particles, self.history.position_region[:, index_largest_particles[0]]))
-            gworst = append(gworst, max(pos_largest_particles[:, i], key=abs))
-        gworst = max(gworst, key=abs)
         new_bounds = zeros((self.number_dimensions, 2))
         for i in range(self.number_dimensions):
             new_bounds[i, 0] = (-max(abs(pos_largest_particles[i, :])))
             new_bounds[i, 1] = (max(abs(pos_largest_particles[i, :])))
-        while iter < iter_limit:  # stopping criteria
-            for j in range(0, self.num_part):
-                if j == 0:
-                    alpha = relaxation[iter]
-                    focal_point = alpha*gbest + (1-alpha)*gworst
-                self.swarm[j].spso(focal_point)
-                if new_bounds is not None:
-                    self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
-                else:
-                    self.swarm[j].update_position(self.vel_restraint)
-                self.swarm[j].evaluate_min(iter)
-                self.history.add(self.swarm[j].position, self.swarm[j].fit)
-            iter += 1
+        for k in range(10):
+            gworst = pos_largest_particles[:, k]
+            while iter < (iter_limit+1):  # stopping criteria
+                for j in range(0, self.num_part):
+                    if j == 0:
+                        alpha = (self.gbest-gworst)/iter
+                        focal_point = alpha*gbest + (1-alpha)*gworst
+                    self.swarm[j].spso(focal_point)
+                    if new_bounds is not None:
+                        self.swarm[j].adjust_position(self.vel_restraint, new_bounds)
+                    else:
+                        self.swarm[j].update_position(self.vel_restraint)
+                    self.swarm[j].evaluate_min(iter)
+                    self.history.add(self.swarm[j].position, self.swarm[j].fit)
+                iter += 1
 
     def map_region_RD(self, new_bounds, iter_limit=500, limiter=0.2, bounds_control=1, top_particles=10): #Random and Deconcentrated
         """

@@ -8,7 +8,7 @@ from Modelo_benchmark import modelo_benchmark  # Importing the function to be mi
 from numpy import array, shape, argmax, argmin
 
 function = 'Rastrigin'  # Ackley, Exponencial, Negative-exponencial, Rastrigin, Rosenbrook, Shaffer
-bounds = array([[-10, 10], [-10, 10], [-10, 10]])
+bounds = array([[-10, 10], [-10, 10]])
 pso = PSO(lambda x: modelo_benchmark(x, function, bounds),
           pso_version='PSO-WL',  # SPSO, PSO-WL, PSO-WR pso_chongpeng
           bounds=bounds,  # input limits [(x_min,x_max)]

@@ -128,6 +128,7 @@ class Graph:
                     mp.colorbar()
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
+                    mp.savefig('pos_cov_area{}.png'.format(i))
                     mp.show()
     # Positions
     def positions(self):
@@ -140,6 +141,7 @@ class Graph:
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
+                    mp.savefig('positions{}.png'.format(i))
                     mp.show()
 
 
@@ -152,6 +154,7 @@ class Graph:
             mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
+            mp.savefig('pos_fit_2d_{}.png'.format(i))
             mp.show()
 
     # Interactions(x) X Fitness(y)
@@ -164,6 +167,7 @@ class Graph:
             aux = append(aux, self.fit[i])
         mp.plot(aux, '.', label='interaction vs fitness')
         mp.legend()
+        mp.savefig('int_fitness.png')
         mp.show()
 
     # Interactions(x) X Fitness average(y)
@@ -176,6 +180,7 @@ class Graph:
             self.ave = append(self.ave, average(self.fit[(self.num_part*i):(self.num_part*(i+1))]))
         mp.plot(self.ave, '-', label='fitness average')
         mp.legend()
+        mp.savefig('int_fit_average.png')
         mp.show()
 
     # Interactions(x) X Fitness standart desviation(y)
@@ -190,6 +195,7 @@ class Graph:
             sd = append(sd, std((self.fit[(self.num_part*i):(self.num_part*(i+1))], aux)))
         mp.plot(sd, '-', label='standart desviation')
         mp.legend()
+        mp.savefig('int_fit_sd.png')
         mp.show()
 
     # Interactions(x) X Velocity(x)
@@ -200,6 +206,7 @@ class Graph:
         for i in range(self.dim):
             mp.plot(self.vel[i], '.', label=r'$v_{}$'.format(i+1), alpha=(1/(i+1)))
         mp.legend()
+        mp.savefig('int_velocity.png')
         mp.show()
 
     # Interactions(x) X Velocity Average(x)
@@ -215,6 +222,7 @@ class Graph:
                 self.avev[i] = append(self.avev[i], average(self.vel[i, (self.num_part * j):(self.num_part * (j + 1))]))
             mp.plot(self.avev[i], '-', label=r'$v_{}$'.format(i+1))
         mp.legend()
+        mp.savefig('int_vel_average.png')
         mp.show()
 
     # Interactions(x) X Velocity standart desviation(x)
@@ -233,6 +241,7 @@ class Graph:
                 sd[i] = append(sd[i], std((self.vel[i, (self.num_part * j):(self.num_part * (j + 1))], aux)))
             mp.plot(sd[i], '-', label=r'$v_{}$'.format(i+1))
         mp.legend()
+        mp.savefig('int_vel_sd.png')
         mp.show()
 
 class Graph_cut:
@@ -338,6 +347,7 @@ class Graph_cut:
                     mp.colorbar()
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
+                    mp.savefig('pos_cov_area_cut{}.png'.format(i))
                     mp.show()
     # Positions
     def positions(self):
@@ -350,6 +360,7 @@ class Graph_cut:
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
+                    mp.savefig('positions_cut{}.png'.format(i))
                     mp.show()
 
 
@@ -362,5 +373,5 @@ class Graph_cut:
             mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
+            mp.savefig('pos_fit_2d_cut{}.png'.format(i))
             mp.show()
-
