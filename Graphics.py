@@ -2,6 +2,8 @@
 Graphics
 @author: Renilton
 """
+import random
+
 from numpy import array, linspace, shape, sqrt, average, append, vstack, std, zeros
 import plotly.graph_objects as go
 from bokeh.plotting import figure, show
@@ -128,7 +130,8 @@ class Graph:
                     mp.colorbar()
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
-                    mp.savefig('pos_cov_area{}.png'.format(i))
+                    # r = random.random()
+                    # mp.savefig('pos_cov_area{}.png'.format(r))
                     mp.show()
     # Positions
     def positions(self):
@@ -141,7 +144,8 @@ class Graph:
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
-                    mp.savefig('positions{}.png'.format(i))
+                    # r = random.random()
+                    # mp.savefig('positions{}.png'.format(r))
                     mp.show()
 
 
@@ -154,7 +158,8 @@ class Graph:
             mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
-            mp.savefig('pos_fit_2d_{}.png'.format(i))
+            # r = random.random()
+            # mp.savefig('pos_fit_2d_{}.png'.format(r))
             mp.show()
 
     # Interactions(x) X Fitness(y)
@@ -347,7 +352,8 @@ class Graph_cut:
                     mp.colorbar()
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
-                    mp.savefig('pos_cov_area_cut{}.png'.format(i))
+                    # r = random.random()
+                    # mp.savefig('pos_cov_area_cut{}.png'.format(r))
                     mp.show()
     # Positions
     def positions(self):
@@ -360,7 +366,8 @@ class Graph_cut:
                     mp.plot(self.posit[i], self.posit[(j + 1)], '.', label=r'$x_{}$ vs $x_{}$'.format(i+1,j+2), color='#202020')
                     mp.plot(self.optimal_point[i], self.optimal_point[j+1], '.', color='red', label='optimal point')
                     mp.legend()
-                    mp.savefig('positions_cut{}.png'.format(i))
+                    # r = random.random()
+                    # mp.savefig('positions_cut{}.png'.format(r))
                     mp.show()
 
 
@@ -373,5 +380,6 @@ class Graph_cut:
             mp.plot(self.posit[i], self.fit, '.', label='x{} vs fit'.format(i+1))
             mp.plot(self.optimal_point[i], self.optimal_fit, '.', color='red', label='optimal point')
             mp.legend()
-            mp.savefig('pos_fit_2d_cut{}.png'.format(i))
+            # r = random.random()
+            # mp.savefig('pos_fit_2d_cut{}.png'.format(r))
             mp.show()
