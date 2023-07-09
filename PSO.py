@@ -508,7 +508,7 @@ class PSO:
 
         self.number_dimensions = bounds.shape[0]
         self.fit_gbest = float()
-        self.gbest = []
+        self.gbest = array([])
         self.swarm = array([])
         self.function_cut = kwargs.get("function_cut")
         self.vel_restraint = kwargs.get("vel_restraint") if kwargs.get("vel_restraint") is not None else -0.01
@@ -564,7 +564,7 @@ class PSO:
 
             for j in range(0, self.num_part):
                 if self.swarm[j].fit < self.fit_gbest or self.iter == 0:
-                    self.gbest = list(self.swarm[j].position)
+                    self.gbest = self.swarm[j].position
                     self.fit_gbest = float(self.swarm[j].fit)
 
                 if self.pso_version == 'SPSO':
@@ -612,6 +612,7 @@ class PSO:
         """
         iter = 1
         focal_point = []
+        # relaxation = linspace(0.0, 1.0, num=iter_limit)
         largest_particles = nlargest(top_particles, self.history.fitness_region)
         index_largest_particles = where(self.history.fitness_region == largest_particles[0])
         pos_largest_particles = self.history.position_region[:, index_largest_particles[0]]
@@ -627,6 +628,7 @@ class PSO:
             while iter < (iter_limit+1):  # stopping criteria
                 for j in range(0, self.num_part):
                     if j == 0:
+                        # alpha = relaxation[iter-1]
                         alpha = (self.gbest-gworst)/iter
                         focal_point = alpha*self.gbest + (1-alpha)*gworst
                     self.swarm[j].spso(focal_point)
